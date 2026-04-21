@@ -1,6 +1,7 @@
 import customtkinter as ctk
-from app.views.main_window import MainWindow
+
 from app.controllers.main_controller import MainController
+from app.views.main_window import MainWindow
 
 
 def main() -> None:

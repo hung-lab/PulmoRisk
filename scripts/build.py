@@ -1,6 +1,5 @@
 """Build script for creating application distributions."""
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -49,7 +48,7 @@ def build_app() -> None:
     run_command(pyinstaller_cmd, cwd=str(project_root))
 
     print("Build completed successfully!")
-    print(f"Check the 'dist' directory for the built application.")
+    print("Check the 'dist' directory for the built application.")
 
 
 if __name__ == "__main__":

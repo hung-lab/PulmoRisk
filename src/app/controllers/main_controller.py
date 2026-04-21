@@ -1,5 +1,7 @@
 """Main application controller."""
 
+import threading
+import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,8 +33,6 @@ class MainController:
         if self.view:
             self.view.update_status("Button clicked!")
             # Animate progress bar
-            import threading
-            import time
 
             def animate_progress():
                 for i in range(11):

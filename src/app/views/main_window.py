@@ -1,7 +1,8 @@
 """Main application window view using CustomTkinter."""
 
-import customtkinter as ctk
 from typing import TYPE_CHECKING
+
+import customtkinter as ctk
 
 if TYPE_CHECKING:
     from app.controllers.main_controller import MainController
@@ -127,7 +128,6 @@ class MainWindow:
             value: The slider value
         """
         # You can use this value in your application
-        pass
 
     def update_status(self, message: str) -> None:
         """Update the status label.
