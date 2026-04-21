@@ -1,12 +1,9 @@
-version: '3.8'
-
 services:
   app:
     build: .
     container_name: tkinter-app-dev
     volumes:
-      - ./src:/app/src
-      - ./scripts:/app/scripts
+      - .:/app
     environment:
       - DISPLAY=${DISPLAY}
       - XAUTHORITY=${XAUTHORITY}
