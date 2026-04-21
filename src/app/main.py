@@ -15,6 +15,8 @@ def main() -> None:
     controller = MainController(root)
     view = MainWindow(root, controller)
 
+    controller.set_view(view)
+
     root.mainloop()
 
 
