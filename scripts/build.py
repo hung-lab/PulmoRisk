@@ -8,18 +8,14 @@ from pathlib import Path
 
 def run_command(cmd: list[str], cwd: str | None = None) -> None:
     """Run a command and handle errors.
-    
+
     Args:
         cmd: Command to run as list of strings
         cwd: Working directory for the command
     """
     try:
         result = subprocess.run(
-            cmd,
-            check=True,
-            cwd=cwd,
-            capture_output=True,
-            text=True
+            cmd, check=True, cwd=cwd, capture_output=True, text=True
         )
         print(f"Command {' '.join(cmd)} succeeded")
         if result.stdout:
@@ -33,13 +29,13 @@ def run_command(cmd: list[str], cwd: str | None = None) -> None:
 def build_app() -> None:
     """Build the application for distribution."""
     project_root = Path(__file__).parent.parent
-    
+
     print("Building application...")
-    
+
     # Install dependencies
     print("Installing dependencies...")
     run_command([sys.executable, "-m", "uv", "sync", "--all-extras"])
-    
+
     # Build with pyinstaller
     print("Building with pyinstaller...")
     pyinstaller_cmd = [
@@ -48,10 +44,10 @@ def build_app() -> None:
         "--windowed",
         "--name=tkinter-app",
         "--add-data=src/app;src/app",
-        "src/app/main.py"
+        "src/app/main.py",
     ]
     run_command(pyinstaller_cmd, cwd=str(project_root))
-    
+
     print("Build completed successfully!")
     print(f"Check the 'dist' directory for the built application.")
 
