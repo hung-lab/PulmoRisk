@@ -5,12 +5,13 @@ import tkinter as tk
 from tkinter import filedialog
 from typing import TYPE_CHECKING
 
-from app.utils.helpers import bounded_float
-from app.views.components.loading_overlay import RunningOverlay
 import customtkinter as ctk
 
+from app.config.settings import ORANGE_ACCENT, RED_ACCENT
 from app.models.patient_model import SybilInputData
 from app.utils.event_bus import AppEvent
+from app.utils.helpers import bounded_float
+from app.views.components.loading_overlay import RunningOverlay
 
 if TYPE_CHECKING:
     from app.controllers.sybil_controller import SybilController
@@ -88,7 +89,7 @@ class SybilView:
         self.root.grid_columnconfigure(0, weight=1)
 
         # scrollable form body
-        self.container = ctk.CTkScrollableFrame(self.root)
+        self.container = ctk.CTkScrollableFrame(self.root, border_width=0)
         self.container.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
         self.container.grid_columnconfigure(0, weight=1)
 
@@ -110,11 +111,13 @@ class SybilView:
         self._card("CT Scan", self._build_ct)
 
         # results card (hidden until a run completes)
-        self._results_frame = ctk.CTkFrame(self.container)
+        self._results_frame = ctk.CTkFrame(
+            self.container, border_color=(RED_ACCENT, ORANGE_ACCENT), border_width=3
+        )
         self._results_label = ctk.CTkLabel(
             self._results_frame,
             text="",
-            font=ctk.CTkFont(family="Courier", size=13),
+            font=ctk.CTkFont(family="Courier", size=20),
             justify="left",
             anchor="w",
         )
@@ -140,13 +143,13 @@ class SybilView:
 
     def _card(self, title: str, builder) -> None:
         frame = ctk.CTkFrame(self.container)
-        frame.pack(fill="x", pady=8)
+        frame.pack(fill="x", pady=8, padx=16)
 
         ctk.CTkLabel(frame, text=title, font=ctk.CTkFont(size=13, weight="bold")).pack(
             anchor="w", padx=16, pady=(10, 4)
         )
 
-        body = ctk.CTkFrame(frame, fg_color="transparent")
+        body = ctk.CTkFrame(frame, fg_color="transparent", border_width=0)
         body.pack(fill="x", padx=16, pady=(0, 10))
         builder(body)
 
@@ -162,7 +165,7 @@ class SybilView:
 
     def _error_label(self, parent, var: tk.StringVar) -> None:
         ctk.CTkLabel(
-            parent, textvariable=var, anchor="e", text_color=("#F44336", "#f7c485")
+            parent, textvariable=var, anchor="e", text_color=(RED_ACCENT, ORANGE_ACCENT)
         ).pack(side="right", padx=4)
 
     # ─────────────────────────────── FORM SECTIONS ───────────────────────
@@ -443,8 +446,11 @@ class SybilView:
             self._overlay.set_progress(value)
 
         elif event.type == "log":
-            # keep overlay stage label in sync while a run is active
             if self._running and event.message:
+                # Forward every log line to the overlay's live feed
+                self._overlay.append_log(event.message, event.level)
+
+                # Also update the stage subtitle for key milestones
                 for key, label in _STAGE_LABELS.items():
                     if key in event.message:
                         self._overlay.set_stage(label)

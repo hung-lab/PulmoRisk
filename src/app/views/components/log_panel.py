@@ -2,14 +2,8 @@ import datetime
 
 import customtkinter as ctk
 
+from app.config.settings import LEVEL_COLOURS, LEVEL_PREFIX
 from app.utils.event_bus import AppEvent
-
-_LEVEL_META = {
-    "INFO": ("i", "info"),
-    "SUCCESS": ("✓", "success"),
-    "WARNING": ("⚠", "warning"),
-    "ERROR": ("✗", "error"),
-}
 
 
 class LogPanel:
@@ -27,7 +21,7 @@ class LogPanel:
         ctk.CTkLabel(
             header,
             text="Activity Log",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
         ).grid(row=0, column=0, sticky="w")
 
         ctk.CTkButton(
@@ -43,19 +37,18 @@ class LogPanel:
             self.parent,
             state="disabled",
             wrap="word",
-            font=ctk.CTkFont(family="Courier", size=11),
+            font=ctk.CTkFont(family="Courier", size=16),
         )
         self.box.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
 
         # Tags
-        self.box.tag_config("info", foreground="#5B9BD5")
-        self.box.tag_config("success", foreground="#4CAF50")
-        self.box.tag_config("warning", foreground="#FF9800")
-        self.box.tag_config("error", foreground="#F44336")
+        # Configure per-level colour tags
+        for level, colour in LEVEL_COLOURS.items():
+            self.box.tag_config(level.lower(), foreground=colour)
         self.box.tag_config("ts", foreground="#888888")
 
     def log(self, message: str, level: str = "INFO") -> None:
-        prefix, tag = _LEVEL_META.get(level.upper(), ("•", "info"))
+        prefix, tag = LEVEL_PREFIX.get(level.upper(), ("•", "info"))
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
 
         self.box.configure(state="normal")

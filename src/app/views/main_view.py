@@ -18,12 +18,12 @@ class MainWindow:
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
-        self._left_frame = ctk.CTkFrame(self.root)
-        self._left_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self._main_frame = ctk.CTkFrame(self.root, border_width=0)
+        self._main_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
-        self._build_left_panel(self._left_frame)
+        self._build_main_panel(self._main_frame)
 
-    def _build_left_panel(self, parent: ctk.CTkFrame) -> None:
+    def _build_main_panel(self, parent: ctk.CTkFrame) -> None:
         parent.grid_rowconfigure(0, weight=0)
         parent.grid_rowconfigure(1, weight=1)
         parent.grid_columnconfigure(0, weight=1)

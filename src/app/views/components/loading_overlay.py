@@ -13,6 +13,9 @@ Usage
     # update text as stages progress (called from handle_event)
     overlay.set_stage("Running CT analysis…")
 
+    # append a log line to the live feed
+    overlay.append_log("Loaded 312 DICOM slices", level="INFO")
+
     # update progress bar (keeps animated until value reaches 1.0)
     overlay.set_progress(0.7)
 
@@ -22,11 +25,17 @@ Usage
 
 from __future__ import annotations
 
+import datetime
+
 import customtkinter as ctk
+
+from app.config.settings import LEVEL_COLOURS, LEVEL_PREFIX
+
+_MAX_LINES = 6  # how many log lines to keep visible at once
 
 
 class RunningOverlay:
-    """Full-frame animated loading overlay.
+    """Full-frame animated loading overlay with a live log feed.
 
     Places itself over *parent* using ``place(relwidth=1, relheight=1)``
     and sits below the stacking order until :meth:`show` is called.
@@ -53,6 +62,11 @@ class RunningOverlay:
         self._stage_label.configure(text=stage)
         self._elapsed_label.configure(text="0s elapsed")
 
+        # Clear any log lines from a previous run
+        self._log_box.configure(state="normal")
+        self._log_box.delete("1.0", "end")
+        self._log_box.configure(state="disabled")
+
         # always start in indeterminate mode so the bar animates immediately
         self._bar.configure(mode="indeterminate")
         self._bar.start()
@@ -70,6 +84,22 @@ class RunningOverlay:
         """Update the stage subtitle (e.g. 'Running CT analysis…')."""
         self._stage_label.configure(text=text)
 
+    def append_log(self, message: str, level: str = "INFO") -> None:
+        """Append a timestamped log line to the live feed on the overlay."""
+        prefix, tag = LEVEL_PREFIX.get(level.upper(), ("•", "info"))
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+
+        self._log_box.configure(state="normal")
+
+        # Keep the box from growing forever
+        lines = int(self._log_box.index("end-1c").split(".")[0])
+        if lines >= _MAX_LINES:
+            self._log_box.delete("1.0", "2.0")
+
+        self._log_box.insert("end", f"[{timestamp}] {prefix} {message}\n", tag)
+        self._log_box.see("end")
+        self._log_box.configure(state="disabled")
+
     def set_progress(self, value: float) -> None:
         """React to a progress milestone.
 
@@ -83,10 +113,6 @@ class RunningOverlay:
             self._bar.set(1.0)
             self._stage_label.configure(text="Complete!")
 
-        # For 0 < value < 1 just let the indeterminate animation keep running.
-        # The stage label (updated via set_stage) already communicates which
-        # phase is active — no need to freeze the bar at e.g. 20% or 70%.
-
     @property
     def is_visible(self) -> bool:
         return self._visible
@@ -94,7 +120,7 @@ class RunningOverlay:
     # ── internal ──────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        self._frame = ctk.CTkFrame(self._parent, fg_color=("gray95", "#1A1F2E"))
+        self._frame = ctk.CTkFrame(self._parent)
         self._frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         self._frame.lower()
 
@@ -115,7 +141,7 @@ class RunningOverlay:
             font=ctk.CTkFont(size=14),
             text_color="gray60",
         )
-        self._stage_label.pack(pady=(0, 24))
+        self._stage_label.pack(pady=(0, 16))
 
         self._bar = ctk.CTkProgressBar(inner, width=360, height=10)
         self._bar.pack()
@@ -127,7 +153,23 @@ class RunningOverlay:
             font=ctk.CTkFont(size=12),
             text_color="gray60",
         )
-        self._elapsed_label.pack(pady=(8, 0))
+        self._elapsed_label.pack(pady=(6, 12))
+
+        # ── live log feed ─────────────────────────────────────────────────
+        self._log_box = ctk.CTkTextbox(
+            inner,
+            width=440,
+            height=112,  # ~6 lines at 11pt
+            state="disabled",
+            wrap="word",
+            font=ctk.CTkFont(family="Courier", size=11),
+            border_width=1,
+        )
+        self._log_box.pack()
+
+        # Configure per-level colour tags
+        for level, colour in LEVEL_COLOURS.items():
+            self._log_box.tag_config(level.lower(), foreground=colour)
 
     def _tick(self) -> None:
         """Increment the elapsed-time counter every second while visible."""

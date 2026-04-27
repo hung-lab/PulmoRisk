@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import os
-from typing import Callable
+from typing import TYPE_CHECKING
 
-from app.config.settings import BASE_PATH, ORANGE_ACCENT, RED_ACCENT
 import customtkinter as ctk
 from PIL import Image
+
+from app.config.settings import (
+    BASE_PATH,
+    PRIMARY_BLUE,
+    SECONDARY_BLUE,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class SideBar:
@@ -20,14 +28,18 @@ class SideBar:
         self._buttons: dict[str, ctk.CTkButton] = {}
         self._active: str | None = None
 
-        self.frame = ctk.CTkFrame(parent, corner_radius=0, width=200)
+        self.frame = ctk.CTkFrame(parent, width=200, border_width=0)
         self.frame.grid_propagate(False)
         self.frame.grid_rowconfigure(0, weight=1)  # push buttons to top
         self.frame.grid_columnconfigure(0, weight=1)
 
         # inner scrollable column so it never overflows
-        self._inner = ctk.CTkFrame(self.frame, fg_color="transparent", corner_radius=0)
-        self._inner.pack(fill="x", pady=(12, 0), padx=(12, 0))
+        # self._inner = ctk.CTkScrollableFrame(
+        #     self.frame,
+        #     fg_color="transparent",
+        #     border_width=0,
+        # )
+        # self._inner.pack(fill="x", pady=(12, 0), padx=(12, 0))
 
         full_img_path = os.path.join(BASE_PATH, "assets", "house.png")
         logo_img_data = Image.open(full_img_path)
@@ -35,7 +47,7 @@ class SideBar:
             dark_image=logo_img_data, light_image=logo_img_data, size=(77.68, 85.42)
         )
 
-        ctk.CTkLabel(master=self._inner, text="", image=logo_img).pack(
+        ctk.CTkLabel(master=self.frame, text="", image=logo_img).pack(
             pady=(38, 0), anchor="center"
         )
 
@@ -53,7 +65,7 @@ class SideBar:
         img = ctk.CTkImage(dark_image=img_data, light_image=img_data)
 
         btn = ctk.CTkButton(
-            self._inner,
+            self.frame,
             image=img,
             text=label,
             anchor="w",
@@ -61,10 +73,10 @@ class SideBar:
             border_width=0,
             corner_radius=0,
             fg_color="transparent",
+            text_color=("#000000", "#f1f5f9"),
         )
-        btn.pack(fill="x", padx=8, ipady=5, pady=(16, 0))
+        btn.pack(fill="x", padx=8, ipady=8, pady=(16, 0))
         self._buttons[label] = btn
-
         if self._active is None:
             self.set_active(label)
 
@@ -74,10 +86,14 @@ class SideBar:
             return
 
         if self._active and self._active in self._buttons:
-            self._buttons[self._active].configure(fg_color="transparent")
+            self._buttons[self._active].configure(
+                fg_color="transparent", text_color=("#000000", "#f1f5f9")
+            )
 
         self._active = label
         if label in self._buttons:
             self._buttons[label].configure(
-                fg_color=("gray85", "gray85"), text_color="#000000"
+                fg_color=(PRIMARY_BLUE, SECONDARY_BLUE),
+                hover_color=(SECONDARY_BLUE, PRIMARY_BLUE),
+                text_color=("#f1f5f9", "#000000"),
             )

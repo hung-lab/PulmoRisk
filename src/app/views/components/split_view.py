@@ -28,13 +28,13 @@ class SplitView:
         self.sidebar.frame.grid(row=0, column=0, sticky="nsew")
 
         # ── main content area ─────────────────────────────────────────────
-        self.middle = ctk.CTkFrame(self.root)
-        self.middle.grid(row=0, column=1, sticky="nsew", padx=4, pady=0)
+        self.middle = ctk.CTkFrame(self.root, border_width=0)
+        self.middle.grid(row=0, column=1, sticky="nsew", padx=40, pady=40)
         self.middle.grid_rowconfigure(0, weight=1)
         self.middle.grid_columnconfigure(0, weight=1)
 
         # ── log panel ─────────────────────────────────────────────────────
-        self.right = ctk.CTkFrame(self.root, width=400)
+        self.right = ctk.CTkFrame(self.root, width=400, border_width=0)
         self.right.grid(row=0, column=2, sticky="nsew", padx=(4, 0), pady=0)
         self.right.grid_propagate(False)
 

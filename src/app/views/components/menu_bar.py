@@ -176,7 +176,7 @@ class MenuBar:
 
     def show_app_info(self) -> None:
         """Display application version and author info."""
-        from app.constants import (  # noqa: PLC0415
+        from app.config.settings import (  # noqa: PLC0415
             __author__,
             __build_date__,
             __version__,

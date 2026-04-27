@@ -83,8 +83,8 @@ tkinter-app/
 ├── src/
 │   └── app/
 │       ├── __init__.py
-│       ├── assets/         # Icons, logos, images
-│       ├── config/         # Config files, global settings
+│       ├── assets/         # Icons, logos, images, styles
+│       ├── config/         # Config files, Application settings
 │       │   ├── __init__.py
 │       │   └── settings.py
 │       ├── main.py         # Application entry point
@@ -92,12 +92,17 @@ tkinter-app/
 │       ├── views/          # UI components
 │       │   ├── __init__.py
 │           └── components/ # Reusable UI components
-│           └── dialogs/    # Reusable UI dialogs
+│           └── dialogs/    # Dialog Windows
 │       │   └── main_view.py
 │       └── controllers/    # Business logic
 │           ├── __init__.py
 │           └── app_controller.py
 │           └── base_controller.py
+│       └── utils/                      # Utility functions
+│           ├── __init__.py
+│           └── event_bus.py            # Threading logic
+│           └── helpers.py              # Helper functions
+│           └── sybil_epi.py            # Sybil Epi Scoring implementation
 ├── tests/
 ├── scripts/
 │   └── build.py           # Build script for distribution

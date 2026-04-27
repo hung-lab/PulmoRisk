@@ -8,8 +8,21 @@ if getattr(sys, "frozen", False):
 else:
     BASE_PATH = PROJECT_ROOT
 
+# Colour per log level — mirrors LogPanel's palette
+LEVEL_COLOURS: dict[str, str] = {
+    "INFO": "#569fd3",
+    "SUCCESS": "#bed600",
+    "WARNING": "#ec7a08",
+    "ERROR": "#cc0033",
+}
+LEVEL_PREFIX: dict[str, str] = {
+    "INFO": ("i", "info"),
+    "SUCCESS": ("✓", "success"),
+    "WARNING": ("⚠", "warning"),
+    "ERROR": ("✗", "error"),
+}
 
-PRIMARY_BLUE = "#0B4F8A"
-SECONDARY_BLUE = "#1F78B4"
-RED_ACCENT = "#C62828"
-ORANGE_ACCENT = "#F57C00"
+PRIMARY_BLUE = "#00467f"
+SECONDARY_BLUE = "#569fd3"
+RED_ACCENT = "#cc0033"
+ORANGE_ACCENT = "#ec7a08"

@@ -1,4 +1,4 @@
-from app.controllers.main_controller import MainController
+from app.controllers.app_controller import AppController
 
 
 class FakeView:
@@ -10,7 +10,7 @@ class FakeView:
 
 
 def test_button_click_updates_view():
-    controller = MainController(root=None)
+    controller = AppController(root=None)
 
     fake_view = FakeView()
     controller.set_view(fake_view)

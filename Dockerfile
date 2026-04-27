@@ -1,5 +1,3 @@
-# NOTE: To run this container with GPU access you must use the NVIDIA Container Toolkit:
-#   docker run --gpus all ...
 FROM python:3.10
 
 # ENV DEBIAN_FRONTEND=noninteractive
@@ -16,10 +14,6 @@ RUN apt-get update && apt-get install -y \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Register /usr/bin/python -> python3.10.
-# Ubuntu 22.04 ships python3.10 as the default python3 already, so no
-# override is needed for python3. Only the bare 'python' symlink is missing.
-#RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
 
 WORKDIR /app
 
@@ -38,8 +32,4 @@ RUN useradd --create-home --shell /bin/bash appuser \
 
 USER appuser
 
-# Fix: 'uv run python -m app.main' launches a bare Python process that doesn't
-# have the src/ layout on sys.path, so 'app' is not found.
-# Using the console script defined in pyproject.toml ([project.scripts]:
-# tkinter-app = "app.main:main") runs the correct venv entry point directly.
-#ENTRYPOINT ["/app/.venv/bin/tkinter-app"]
+ENTRYPOINT ["uv run tkinter-app"]
