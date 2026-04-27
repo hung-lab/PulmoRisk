@@ -22,7 +22,7 @@ def main() -> None:
 
     ctk.set_appearance_mode("System")
 
-    full_theme_path = os.path.join(BASE_PATH, "assets", "themes", "HungLab.json")
+    full_theme_path = os.path.join(BASE_PATH, "assets", "themes", "BlueEmber.json")
     ctk.set_default_color_theme(full_theme_path)
 
     root = ctk.CTk()
