@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import customtkinter as ctk
 
 from app.utils.helpers import center_window
+from app.utils.ui_config import SPACE_SM, SPACE_XL, SPACE_XS
 
 if TYPE_CHECKING:
     from app.utils.event_bus import AppEvent, EventBus
@@ -53,6 +54,7 @@ class SplashScreen:
         self._win.focus_force()
         self._win.grab_set()
 
+        self._closed = False
         bus.subscribe(self._handle_event)
 
     # ── build ──────────────────────────────────────────────────────────────
@@ -68,14 +70,14 @@ class SplashScreen:
             inner,
             text="Lung Cancer Risk Model",
             font=ctk.CTkFont(size=22, weight="bold"),
-        ).pack(pady=(0, 4))
+        ).pack(pady=(0, SPACE_XS))
 
         ctk.CTkLabel(
             inner,
             text="Powered by Sybil · EPI Ensemble",
             font=ctk.CTkFont(size=13),
             text_color="gray60",
-        ).pack(pady=(0, 28))
+        ).pack(pady=(0, SPACE_XL))
 
         self._bar = ctk.CTkProgressBar(inner, width=340, height=8)
         self._bar.pack()
@@ -88,18 +90,22 @@ class SplashScreen:
             font=ctk.CTkFont(size=12),
             text_color="gray60",
         )
-        self._status.pack(pady=(10, 0))
+        self._status.pack(pady=(SPACE_SM, 0))
 
         ctk.CTkLabel(
             inner,
             text="First run: model weights will be downloaded to ~/.sybil/",
             font=ctk.CTkFont(size=11),
             text_color="gray50",
-        ).pack(pady=(6, 0))
+        ).pack(pady=(SPACE_SM, 0))
 
     # ── event handling ──────────────────────────────────────────────────────
 
     def _handle_event(self, event: AppEvent) -> None:
+        # Unsubscribed after close — guard against any in-flight events.
+        if self._closed:
+            return
+
         if event.type == "log" and event.message:
             self._status.configure(text=event.message)
 
@@ -110,6 +116,8 @@ class SplashScreen:
             self._show_error(event.message or "Model failed to load.")
 
     def _close_and_show(self) -> None:
+        self._closed = True
+        self._bus.unsubscribe(self._handle_event)
         self._bar.stop()
         self._win.grab_release()
         self._win.destroy()

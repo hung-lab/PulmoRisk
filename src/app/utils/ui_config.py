@@ -1,0 +1,21 @@
+# ui_config.py
+
+# Base spacing scale
+SPACE_XS = 4
+SPACE_SM = 8
+SPACE_MD = 12
+SPACE_LG = 20
+SPACE_XL = 32
+
+# Layout-specific spacing
+CARD_PAD_X = 24
+CARD_PAD_Y = 20
+
+SECTION_GAP_TOP = 30
+SECTION_GAP_BOTTOM = 10
+
+INPUT_GAP = 10
+BUTTON_GAP = 18
+
+INPUT_WIDTH = 280
+LABEL_WIDTH = 220

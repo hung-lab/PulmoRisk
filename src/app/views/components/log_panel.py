@@ -1,5 +1,6 @@
 import datetime
 
+from app.utils.ui_config import SPACE_MD, SPACE_SM, SPACE_XS
 import customtkinter as ctk
 
 from app.config.settings import LEVEL_COLOURS, LEVEL_PREFIX
@@ -15,7 +16,9 @@ class LogPanel:
 
         # Header
         header = ctk.CTkFrame(self.parent, fg_color="transparent", border_width=0)
-        header.grid(row=0, column=0, sticky="ew", padx=8, pady=(12, 4))
+        header.grid(
+            row=0, column=0, sticky="ew", padx=SPACE_SM, pady=(SPACE_MD, SPACE_XS)
+        )
         header.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -37,9 +40,9 @@ class LogPanel:
             self.parent,
             state="disabled",
             wrap="word",
-            font=ctk.CTkFont(family="Courier", size=16),
+            font=ctk.CTkFont(size=16),
         )
-        self.box.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        self.box.grid(row=1, column=0, sticky="nsew", padx=SPACE_SM, pady=(0, SPACE_SM))
 
         # Tags
         # Configure per-level colour tags

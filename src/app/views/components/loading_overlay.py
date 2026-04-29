@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import datetime
 
+from app.utils.ui_config import SPACE_LG, SPACE_MD, SPACE_SM
 import customtkinter as ctk
 
 from app.config.settings import LEVEL_COLOURS, LEVEL_PREFIX
@@ -120,12 +121,12 @@ class RunningOverlay:
     # ── internal ──────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        self._frame = ctk.CTkFrame(self._parent)
+        self._frame = ctk.CTkFrame(self._parent, border_width=0)
         self._frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         self._frame.lower()
 
         # centred content block
-        inner = ctk.CTkFrame(self._frame, fg_color="transparent")
+        inner = ctk.CTkFrame(self._frame, fg_color="transparent", border_width=0)
         inner.place(relx=0.5, rely=0.5, anchor="center")
 
         self._title_label = ctk.CTkLabel(
@@ -133,7 +134,7 @@ class RunningOverlay:
             text="Running…",
             font=ctk.CTkFont(size=22, weight="bold"),
         )
-        self._title_label.pack(pady=(0, 6))
+        self._title_label.pack(pady=(0, SPACE_SM))
 
         self._stage_label = ctk.CTkLabel(
             inner,
@@ -141,7 +142,7 @@ class RunningOverlay:
             font=ctk.CTkFont(size=14),
             text_color="gray60",
         )
-        self._stage_label.pack(pady=(0, 16))
+        self._stage_label.pack(pady=(0, SPACE_LG))
 
         self._bar = ctk.CTkProgressBar(inner, width=360, height=10)
         self._bar.pack()
@@ -153,7 +154,7 @@ class RunningOverlay:
             font=ctk.CTkFont(size=12),
             text_color="gray60",
         )
-        self._elapsed_label.pack(pady=(6, 12))
+        self._elapsed_label.pack(pady=(SPACE_SM, SPACE_MD))
 
         # ── live log feed ─────────────────────────────────────────────────
         self._log_box = ctk.CTkTextbox(

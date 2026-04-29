@@ -1,8 +1,32 @@
+import subprocess
+import sys
+import webbrowser
+from pathlib import Path
+
+import customtkinter as ctk
+
+from app.config.settings import PROJECT_ROOT
+
+
+def resolve_color(light: str, dark: str) -> str:
+    return dark if ctk.get_appearance_mode() == "Dark" else light
+
+
+def open_url(url: str) -> None:
+    if sys.platform.startswith("linux"):
+        try:
+            subprocess.Popen(["xdg-open", url])
+        except FileNotFoundError:
+            webbrowser.open(url)  # fallback if xdg-open not available
+    else:
+        webbrowser.open(url)
+
+
 def bounded_float(label, min_val, max_val):
     def check(val):
         f = float(val)
         if f < min_val or f > max_val:
-            raise ValueError(f"{label} must be in [{min_val}, {max_val}]")
+            raise ValueError(f"{label} must be between {min_val} and {max_val}")
         return f
 
     return check
@@ -46,3 +70,8 @@ def center_window(
     x = (sw - w) // 2
     y = (sh - h) // 2
     win.geometry(f"{w}x{h}+{x}+{y}")
+
+
+def resource_path(*parts):
+    base = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else PROJECT_ROOT
+    return base.joinpath(*parts)

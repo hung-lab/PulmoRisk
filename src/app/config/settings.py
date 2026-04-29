@@ -8,6 +8,10 @@ if getattr(sys, "frozen", False):
 else:
     BASE_PATH = PROJECT_ROOT
 
+__version__ = "1.0.0"
+__build_date__ = "2026-04-28"
+__author__ = "Wisam Al Abed"
+
 # Colour per log level — mirrors LogPanel's palette
 LEVEL_COLOURS: dict[str, str] = {
     "INFO": "#569fd3",
@@ -26,3 +30,5 @@ PRIMARY_BLUE = "#00467f"
 SECONDARY_BLUE = "#569fd3"
 RED_ACCENT = "#cc0033"
 ORANGE_ACCENT = "#ec7a08"
+
+_ERROR_COLOUR = (RED_ACCENT, ORANGE_ACCENT)

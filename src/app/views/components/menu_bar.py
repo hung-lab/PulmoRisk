@@ -8,6 +8,15 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
+from app.config.settings import (
+    _ERROR_COLOUR,
+    __author__,
+    __build_date__,
+    __version__,
+)
+from app.utils.ui_config import BUTTON_GAP, CARD_PAD_X, SPACE_LG, SPACE_MD, SPACE_SM
+from app.views.dialogs.info_dialog import InfoDialog
+
 if TYPE_CHECKING:
     from app.controllers.menubar_controller import MenuBarController
 
@@ -24,7 +33,6 @@ class MenuBar:
 
     def _setup_ui(self) -> None:
         menubar = tk.Menu(self.root)
-        self._apply_menu_theme(menubar)
 
         self._build_file_menu(menubar)
         self._build_view_menu(menubar)
@@ -42,7 +50,6 @@ class MenuBar:
     def _build_file_menu(self, menubar: tk.Menu) -> None:
         _acc = "Cmd" if sys.platform == "darwin" else "Ctrl"
         menu = tk.Menu(menubar, tearoff=0)
-        self._apply_menu_theme(menu)
 
         menu.add_command(
             label="New Run",
@@ -60,7 +67,6 @@ class MenuBar:
     def _build_view_menu(self, menubar: tk.Menu) -> None:
         _acc = "Cmd" if sys.platform == "darwin" else "Ctrl"
         menu = tk.Menu(menubar, tearoff=0)
-        self._apply_menu_theme(menu)
 
         menu.add_command(
             label="Toggle Side Panel",
@@ -76,7 +82,6 @@ class MenuBar:
 
         # Appearance submenu
         appearance_sub = tk.Menu(menu, tearoff=0)
-        self._apply_menu_theme(appearance_sub)
         appearance_sub.add_command(
             label="Light", command=lambda: self.change_appearance_mode("Light")
         )
@@ -92,32 +97,9 @@ class MenuBar:
 
     def _build_help_menu(self, menubar: tk.Menu) -> None:
         menu = tk.Menu(menubar, tearoff=0)
-        self._apply_menu_theme(menu)
         menu.add_command(label="About Lung Cancer Screening", command=self.show_about)
         menu.add_command(label="About This App", command=self.show_app_info)
         menubar.add_cascade(label="Help", menu=menu)
-
-    # ──────────────────────────────────────────────── theme helper ──
-
-    def _apply_menu_theme(self, menu: tk.Menu) -> None:
-        """Style a tk.Menu to roughly match the active CTk colour theme."""
-        mode = ctk.get_appearance_mode()
-        if mode == "Dark":
-            menu.configure(
-                bg="#252B3D",
-                fg="#E8EEF2",
-                activebackground="#2C3442",
-                activeforeground="#E8EEF2",
-                selectcolor="#26A69A",
-            )
-        else:
-            menu.configure(
-                bg="#FFFFFF",
-                fg="#2C3E50",
-                activebackground="#F5F7F9",
-                activeforeground="#2C3E50",
-                selectcolor="#00897B",
-            )
 
     # ──────────────────────────────────────────────── commands ──
 
@@ -134,22 +116,25 @@ class MenuBar:
         dialog.grab_set()
         dialog.focus_force()
 
-        ctk.CTkLabel(dialog, text="Exit the application?").pack(pady=(24, 12))
+        ctk.CTkLabel(dialog, text="Exit the application?").pack(
+            pady=(CARD_PAD_X, SPACE_MD)
+        )
 
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent", border_width=0)
         btn_row.pack()
         ctk.CTkButton(
             btn_row,
             text="Cancel",
             width=100,
             command=dialog.destroy,
-        ).pack(side="left", padx=8)
+        ).pack(side="left", padx=SPACE_SM)
         ctk.CTkButton(
             btn_row,
             text="Exit",
             width=100,
             command=self.controller.quit_app,
-        ).pack(side="left", padx=8)
+            fg_color=_ERROR_COLOUR,
+        ).pack(side="left", padx=SPACE_SM)
 
     def toggle_sidepanel(self) -> None:
         self.controller.toggle_sidepanel()
@@ -162,7 +147,7 @@ class MenuBar:
 
     def show_about(self) -> None:
         """Display a brief info dialog about lung cancer screening."""
-        _show_info_dialog(
+        InfoDialog(
             self.root,
             title="About Lung Cancer Screening",
             message=(
@@ -176,13 +161,7 @@ class MenuBar:
 
     def show_app_info(self) -> None:
         """Display application version and author info."""
-        from app.config.settings import (  # noqa: PLC0415
-            __author__,
-            __build_date__,
-            __version__,
-        )
-
-        _show_info_dialog(
+        InfoDialog(
             self.root,
             title="About This App",
             message=(
@@ -210,8 +189,8 @@ def _show_info_dialog(root: ctk.CTk, title: str, message: str) -> None:
         text=message,
         wraplength=380,
         justify="left",
-    ).pack(padx=20, pady=(20, 12), anchor="w")
+    ).pack(padx=SPACE_LG, pady=(SPACE_LG, SPACE_MD), anchor="w")
 
     ctk.CTkButton(dialog, text="OK", width=100, command=dialog.destroy).pack(
-        pady=(0, 16)
+        pady=(0, BUTTON_GAP)
     )

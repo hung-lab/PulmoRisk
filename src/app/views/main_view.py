@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from app.config.settings import _ERROR_COLOUR, PRIMARY_BLUE, SECONDARY_BLUE
+from app.utils.helpers import open_url, resolve_color
+from app.utils.ui_config import CARD_PAD_X, CARD_PAD_Y, SPACE_MD, SPACE_XS
+
 
 class MainWindow:
     """Static main window (no event system, no controller coupling)."""
@@ -33,16 +37,93 @@ class MainWindow:
             text="Lung Cancer Risk Modelling",
             font=ctk.CTkFont(size=20, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=24, pady=(20, 4))
+        ).grid(
+            row=0, column=0, sticky="w", padx=CARD_PAD_X, pady=(CARD_PAD_Y, SPACE_XS)
+        )
 
-        content = ctk.CTkFrame(parent)
-        content.grid(row=1, column=0, sticky="nsew", padx=16, pady=16)
+        content = ctk.CTkFrame(parent, border_width=0)
+        content.grid(
+            row=1,
+            column=0,
+            sticky="nsew",
+            padx=CARD_PAD_Y,
+            pady=CARD_PAD_Y,
+        )
+        content.grid_rowconfigure(0, weight=0)
+        content.grid_rowconfigure(1, weight=1)
+        content.grid_columnconfigure(0, weight=1)
 
-        self.status_label = ctk.CTkLabel(content, text="TODO", anchor="w")
-        self.status_label.pack(anchor="w", padx=12, pady=12)
+        # ── intro textbox ─────────────────────────────────────────────────────
 
-    # ──────────────────────────────────────────────── STATIC API ──
+        text = ctk.CTkTextbox(
+            content, wrap="word", border_width=0, height=260, fg_color="transparent"
+        )
+        text.grid(
+            row=0, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_MD, SPACE_XS)
+        )
 
-    def set_status(self, message: str) -> None:
-        """Only direct updates from controller if needed."""
-        self.status_label.configure(text=message)
+        def _add_link(label: str, url: str) -> None:
+            tag = f"link_{url}"  # unique per URL, not per label
+            text._textbox.tag_config(
+                tag,
+                foreground=SECONDARY_BLUE,
+                underline=True,
+            )  # config BEFORE insert
+            text.insert("end", label, tag)
+            text._textbox.tag_bind(tag, "<Button-1>", lambda e, u=url: open_url(u))
+            text._textbox.tag_bind(
+                tag, "<Enter>", lambda e: text._textbox.configure(cursor="hand2")
+            )
+            text._textbox.tag_bind(
+                tag, "<Leave>", lambda e: text._textbox.configure(cursor="")
+            )
+
+        text.insert(
+            "end",
+            "This tool estimates an individual's lung cancer risk by combining "
+            "CT imaging analysis with clinical and epidemiological data. "
+            "Two validated models are available:\n\n",
+        )
+
+        text.insert("end", "Sybil-EPI\n\n", "heading")
+        text.insert(
+            "end",
+            "Integrates deep learning-based CT scan analysis (Sybil) with patient "
+            "risk factors — including age, smoking history, and comorbidities — to "
+            "produce a calibrated 6-year risk probability. ",
+        )
+        _add_link("View on GitHub", "https://github.com/hung-lab/Sybil-Epi")
+        text.insert("end", "\n\n")
+
+        text.insert("end", "Integral Radiomics\n\n", "heading")
+        text.insert(
+            "end",
+            "Applies radiomic feature extraction to quantify imaging biomarkers "
+            "from CT scans, providing a complementary risk estimate based on "
+            "tumour texture, shape, and intensity patterns. ",
+        )
+        _add_link("View on GitHub", "https://github.com/hung-lab/INTEGRAL-Radiomics")
+        text.insert("end", "\n\n\n\n")
+
+        text.insert(
+            "end",
+            "Select a model from the tabs above to begin. Ensure a valid DICOM CT "
+            "scan folder is available before running either model.",
+        )
+
+        # style the heading tag
+        text._textbox.tag_config("heading", font=("", 13, "bold"))
+
+        text.configure(state="disabled")
+
+        # ── disclaimer ────────────────────────────────────────────────────────
+        ctk.CTkLabel(
+            content,
+            text="⚠  This tool is intended for research and clinical decision support only. "
+            "Results should be interpreted by a qualified clinician and do not constitute a diagnosis.",
+            wraplength=520,
+            justify="left",
+            anchor="w",
+            text_color=_ERROR_COLOUR,
+            font=ctk.CTkFont(size=12),
+        ).grid(row=1, column=0, sticky="w", padx=SPACE_MD, pady=(SPACE_XS, SPACE_MD))

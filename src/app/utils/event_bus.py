@@ -26,6 +26,9 @@ class EventBus:
     def subscribe(self, handler):
         self._subscribers.append(handler)
 
+    def unsubscribe(self, handler):
+        self._subscribers = [s for s in self._subscribers if s != handler]
+
     def emit(self, event: AppEvent) -> None:
         self._queue.put(event)  # safe from any thread
 

@@ -4,12 +4,11 @@ import os
 
 import customtkinter as ctk
 
-from app.config.settings import BASE_PATH
 from app.controllers.app_controller import AppController
 from app.controllers.menubar_controller import MenuBarController
 from app.controllers.sybil_controller import SybilController
 from app.utils.event_bus import EventBus
-from app.utils.helpers import center_window
+from app.utils.helpers import center_window, resource_path
 from app.views.components.log_panel import LogPanel
 from app.views.components.menu_bar import MenuBar
 from app.views.components.split_view import SplitView
@@ -22,7 +21,7 @@ def main() -> None:
 
     ctk.set_appearance_mode("System")
 
-    full_theme_path = os.path.join(BASE_PATH, "assets", "themes", "BlueEmber.json")
+    full_theme_path = resource_path("assets", "themes", "BlueEmber.json")
     ctk.set_default_color_theme(full_theme_path)
 
     root = ctk.CTk()
@@ -37,19 +36,15 @@ def main() -> None:
 
     split = SplitView(root)
 
-    log_panel = LogPanel(split.right)
+    log_panel = LogPanel(split.log_panel)
     bus.subscribe(log_panel.handle_event)
 
-    # ── Views — each gets its own frame inside split.middle ───────────────
-    home_frame = ctk.CTkFrame(split.middle, fg_color="transparent", border_width=0)
-    MainWindow(home_frame)
-    split.add_view("Home", home_frame, "house.png")
+    # ── Views — each gets its own frame inside tab views ───────────────
+    MainWindow(split.home_tab)
 
     sybil_ctrl = SybilController(root, bus)
-    sybil_frame = ctk.CTkFrame(split.middle, fg_color="transparent", border_width=0)
-    sybil_form = SybilView(sybil_frame, sybil_ctrl)
+    sybil_form = SybilView(split.sybil_tab, sybil_ctrl)
     bus.subscribe(sybil_form.handle_event)
-    split.add_view("Sybil Risk Model", sybil_frame, "house.png")
 
     # ── Controllers ───────────────────────────────────────────────────────
     app_ctrl = AppController(root, bus, split, sybil_form)
