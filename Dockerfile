@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
   build-essential \
   git \
   curl \
+  libgl1 \
+  libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
 
 
@@ -21,6 +23,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
+COPY tests/ ./tests/
 COPY scripts/ ./scripts/
 
 RUN uv sync --reinstall
@@ -32,4 +35,4 @@ RUN useradd --create-home --shell /bin/bash appuser \
 
 USER appuser
 
-ENTRYPOINT ["uv run tkinter-app"]
+#ENTRYPOINT ["uv", "run", "tkinter-app"]
