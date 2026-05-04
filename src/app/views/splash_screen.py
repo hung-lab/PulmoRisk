@@ -64,7 +64,7 @@ class SplashScreen:
         outer = ctk.CTkFrame(self._win)
         outer.pack(fill="both", expand=True)
 
-        inner = ctk.CTkFrame(outer, fg_color="transparent")
+        inner = ctk.CTkFrame(outer, fg_color="transparent", border_width=0)
         inner.place(relx=0.5, rely=0.45, anchor="center")
 
         ctk.CTkLabel(

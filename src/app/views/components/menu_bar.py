@@ -143,9 +143,6 @@ class MenuBar:
             self.root,
             title="About Lung Cancer Screening",
             message=(
-                "Low-dose CT screening is recommended for adults aged 50-80 "
-                "with a 20 pack-year smoking history who currently smoke or "
-                "have quit within the past 15 years.\n\n"
                 "This tool uses the Sybil model combined with epidemiological "
                 "risk factors to estimate 6-year lung cancer risk."
             ),

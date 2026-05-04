@@ -1,10 +1,10 @@
 # Tkinter Foundry
 
-A modern, production-ready tkinter application template with uv, Docker, and CI/CD.
+A modern, production-ready tkinter application with uv, Docker, and CI/CD.
 
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Docker](https://img.shields.io/badge/docker-supported-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Ruff](https://img.shields.io/badge/code%20style-ruff-ff69b4.svg)
 
 ## Features
@@ -17,19 +17,6 @@ A modern, production-ready tkinter application template with uv, Docker, and CI/
 - 📝 **Conventional commits** - Automatic version bumping based on commit patterns
 
 ## Quick Start
-
-### Using the Template
-
-1. **Use this template:**
-   ```bash
-   gh repo create my-tkinter-app --template username/tkinter-foundry --public
-   ```
-
-2. **Clone your new repository:**
-   ```bash
-   git clone https://github.com/username/my-tkinter-app.git
-   cd my-tkinter-app
-   ```
 
 ### Development with Docker
 
@@ -209,9 +196,10 @@ This creates a standalone executable in the `dist/` directory.
 ### Creating a Release
 
 1. Make sure you have conventional commits
-2. Create a new release on GitHub
-3. Tag your release with a version number
-4. The workflow will automatically build for all platforms
+2. When you push commits release please action will automatically create a release PR
+3. when you are ready merge the Release PR
+4. release-please pushes a v* tag
+5. The workflow will automatically build for all platforms
 
 ## Testing
 
@@ -279,5 +267,3 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ---
 
-
-**Start building your tkinter applications with modern tooling and best practices! 🚀**

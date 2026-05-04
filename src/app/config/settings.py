@@ -2,9 +2,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __build_date__ = "2026-04-28"
-__author__ = "Wisam Al Abed"
+__author__ = ""
 
 PRIMARY_LIGHT = "#1e7f8c"
 PRIMARY_DARK = "#2b3d4f"

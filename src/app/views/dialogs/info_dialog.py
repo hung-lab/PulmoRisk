@@ -28,4 +28,4 @@ class InfoDialog:
         )
 
         dialog.update_idletasks()  # force geometry to resolve before centering
-        center_window(dialog)
+        center_window(dialog, fraction=0.15)
