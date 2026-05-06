@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.3...v1.1.4) (2026-05-06)
+
+
+### Bug Fixes
+
+* syntax error in magick command ([6e1513e](https://github.com/hung-lab/Lung_cancer_risk_models/commit/6e1513e42b4492f351f9629ff4e2e74aeef4ef53))
+
 ## [1.1.3](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.2...v1.1.3) (2026-05-06)
 
 
