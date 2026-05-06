@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.4...v1.1.5) (2026-05-06)
+
+
+### Bug Fixes
+
+* bug related to printing and no console mode ([9d1a074](https://github.com/hung-lab/Lung_cancer_risk_models/commit/9d1a074970efaadf0c5104a506522686132581c9))
+
 ## [1.1.4](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.3...v1.1.4) (2026-05-06)
 
 
