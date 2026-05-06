@@ -92,13 +92,14 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Install ImageMagick
+        run: choco install imagemagick -y
+
       - name: Generate .ico
         run: |
-          sudo apt install imagemagick -y
-          convert src/app/assets/icons/app_icon.png \
-            -define icon:auto-resize=256,128,64,48,32,16 \
+          magick src/app/assets/icons/app_icon.png ^
+            -define icon:auto-resize=256,128,64,48,32,16 ^
             src/app/assets/icons/app_icon.ico
-        shell: bash
 
       - name: Build with PyInstaller
         run: uv run pyinstaller --clean --noconfirm lung-windows.spec

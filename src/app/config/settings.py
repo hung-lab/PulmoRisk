@@ -2,8 +2,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-__version__ = "1.1.0"
-__build_date__ = "2026-04-28"
+__version__ = "1.1.2"
+__build_date__ = "2026-05-06"
 __author__ = ""
 
 PRIMARY_LIGHT = "#1e7f8c"
