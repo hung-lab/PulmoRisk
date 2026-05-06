@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.0...v1.1.1) (2026-05-06)
+
+
+### Bug Fixes
+
+* update build scripts as well as improve event bus ([ed9f45f](https://github.com/hung-lab/Lung_cancer_risk_models/commit/ed9f45fe42a06595c346c1c69b55460f8ea340ea))
+
 ## [1.1.0](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.0.0...v1.1.0) (2026-05-04)
 
 
