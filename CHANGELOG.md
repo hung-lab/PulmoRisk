@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.2...v1.1.3) (2026-05-06)
+
+
+### Bug Fixes
+
+* fix windows release icon generation ([fe78d59](https://github.com/hung-lab/Lung_cancer_risk_models/commit/fe78d59229655fb2d2857c8c0618eddcaf0af6dc))
+
 ## [1.1.2](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.1...v1.1.2) (2026-05-06)
 
 
