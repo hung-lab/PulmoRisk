@@ -1,9 +1,10 @@
 """Application entry point."""
 
-import os
 import platform
 import sys
 
+from app.controllers.integral_controller import IntegralController
+from app.views.integral_view import IntegralView
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
@@ -98,6 +99,10 @@ def main() -> None:
     sybil_ctrl = SybilController(root, bus)
     sybil_form = SybilView(split.sybil_tab, sybil_ctrl)
     bus.subscribe(sybil_form.handle_event)
+
+    integral_ctrl = IntegralController(root, bus)
+    integral_form = IntegralView(split.integral_tab, integral_ctrl)
+    bus.subscribe(integral_form.handle_event)
 
     # ── Controllers ───────────────────────────────────────────────────────
     app_ctrl = AppController(root, bus, split, sybil_form)

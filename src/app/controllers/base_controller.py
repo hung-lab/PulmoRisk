@@ -19,5 +19,8 @@ class BaseController:
         self._emit(AppEvent(type="log", message=message, level="ERROR"))
         self._emit(AppEvent(type="ui_state", message="error"))
 
+    def _warn(self, message: str):
+        self._emit(AppEvent(type="log", message=message, level="WARNING"))
+
     def _set_state(self, state: str):
         self._emit(AppEvent(type="ui_state", message=state))

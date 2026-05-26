@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
-from app.config.settings import BORDER_COLOUR, ERROR_COLOUR
+from app.config.settings import (
+    BORDER_COLOUR,
+    ERROR_COLOUR,
+    WARNING_COLOUR,
+    WARNING_COLOUR_HOVER,
+)
 from app.models.patient_model import SybilInputData
 from app.utils.event_bus import AppEvent
 from app.utils.ui_config import (
@@ -91,6 +96,8 @@ class SybilView:
         self.run_button: ctk.CTkButton | None = None
         self._results_frame: ctk.CTkFrame | None = None
 
+        self._mode_var = tk.StringVar(value="single")
+
         self._entries: dict[str, ctk.CTkEntry] = {}
 
         self._setup_ui()
@@ -106,7 +113,36 @@ class SybilView:
         self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
-        # scrollable form body
+        # ─────────────────────────────────────────────────────────────
+        # MODE SELECTOR
+        # ─────────────────────────────────────────────────────────────
+
+        top = ctk.CTkFrame(self.root, fg_color="transparent", border_width=0)
+        top.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=SECTION_GAP_TOP,
+            pady=(SECTION_GAP_TOP, 0),
+        )
+
+        ctk.CTkLabel(
+            top,
+            text="Run Mode",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w", pady=(0, SPACE_XS))
+
+        self._mode_switch = ctk.CTkSegmentedButton(
+            top,
+            values=["single", "batch"],
+            variable=self._mode_var,
+            command=self._on_mode_changed,
+        )
+        self._mode_switch.pack(anchor="w")
+
+        # ─────────────────────────────────────────────────────────────
+        # Scroll container
+        # ─────────────────────────────────────────────────────────────
         self.container = ctk.CTkScrollableFrame(self.root, border_width=0)
         self.container.grid(
             row=1,
@@ -117,24 +153,98 @@ class SybilView:
         )
         self.container.grid_columnconfigure(0, weight=1)
 
+        # ─────────────────────────────────────────────────────────────
+        # Header
+        # ─────────────────────────────────────────────────────────────
         ctk.CTkLabel(
             self.container,
-            text="Sybil Lung Cancer Risk Model",
+            text="Sybil Epi Lung Cancer Risk Model",
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(anchor="w", pady=(SPACE_MD, SPACE_XS))
 
-        ctk.CTkLabel(
+        self._subtitle = ctk.CTkLabel(
             self.container,
             text="Enter patient information to compute risk score",
             text_color=("gray40", "gray90"),
-        ).pack(anchor="w", pady=(0, SPACE_LG))
+        )
+        self._subtitle.pack(anchor="w", pady=(0, SPACE_LG))
 
-        self._card("Patient Demographics", self._build_patient)
-        self._card("Medical History", self._build_history)
-        self._card("Smoking History", self._build_smoking)
-        self._card("CT Scan", self._build_ct)
+        # ─────────────────────────────────────────────────────────────
+        # Single patient UI
+        # ─────────────────────────────────────────────────────────────
+        self._single_frame = ctk.CTkFrame(
+            self.container,
+            fg_color="transparent",
+            border_width=0,
+        )
+        self._single_frame.pack(fill="both", expand=True)
 
-        # results card (hidden until a run completes)
+        self._card("Patient Demographics", self._build_patient, self._single_frame)
+        self._card("Medical History", self._build_history, self._single_frame)
+        self._card("Smoking History", self._build_smoking, self._single_frame)
+        self._card("CT Scan", self._build_ct, self._single_frame)
+
+        # ─────────────────────────────────────────────────────────────
+        # Batch UI
+        # ─────────────────────────────────────────────────────────────
+        self._batch_frame = ctk.CTkFrame(
+            self.container,
+            fg_color="transparent",
+            border_width=0,
+        )
+
+        batch_card = ctk.CTkFrame(self._batch_frame)
+        batch_card.pack(fill="x", pady=CARD_PAD_Y, padx=CARD_PAD_X)
+
+        ctk.CTkLabel(
+            batch_card,
+            text="Batch CSV Processing",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(anchor="w", padx=SECTION_GAP_BOTTOM, pady=(SPACE_SM, SPACE_XS))
+
+        ctk.CTkLabel(
+            batch_card,
+            text=(
+                "Upload a CSV containing patient metadata and CT scan folder paths.\n\n"
+                "Required columns:\n"
+                "- age\n"
+                "- bmi\n"
+                "- copd\n"
+                "- education\n"
+                "- ethnicity\n"
+                "- family_lc_history\n"
+                "- personal_cancer_history\n"
+                "- smoking_duration\n"
+                "- smoking_intensity\n"
+                "- smoking_quit_time\n"
+                "- smoking_status\n"
+                "- ct_scan_dir\n\n"
+                "Optional:\n"
+                "- six_year_risk"
+            ),
+            justify="left",
+            anchor="w",
+        ).pack(anchor="w", padx=SECTION_GAP_BOTTOM, pady=(0, SPACE_MD))
+
+        self.batch_select_button = ctk.CTkButton(
+            batch_card,
+            text="Select CSV File",
+            command=self._on_batch_submit,
+            fg_color=WARNING_COLOUR,
+            hover_color=WARNING_COLOUR_HOVER,
+        )
+        self.batch_select_button.pack(
+            anchor="w",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(0, SPACE_MD),
+        )
+
+        # hidden initially
+        self._batch_frame.pack_forget()
+
+        # ─────────────────────────────────────────────────────────────
+        # Results card
+        # ─────────────────────────────────────────────────────────────
         self._results_frame = ctk.CTkFrame(
             self.container, border_color=ERROR_COLOUR, border_width=3
         )
@@ -147,10 +257,16 @@ class SybilView:
         )
         self._results_label.pack(anchor="w", padx=SPACE_LG, pady=SPACE_MD)
 
-        # run button (pinned below scroll area)
-        bottom = ctk.CTkFrame(self.root, fg_color="transparent")
+        # ─────────────────────────────────────────────────────────────
+        # Bottom action bar
+        # ─────────────────────────────────────────────────────────────
+        bottom = ctk.CTkFrame(self.root, fg_color="transparent", border_width=0)
         bottom.grid(
-            row=2, column=0, sticky="ew", padx=BUTTON_GAP, pady=(SPACE_XS, BUTTON_GAP)
+            row=2,
+            column=0,
+            sticky="ew",
+            padx=BUTTON_GAP,
+            pady=(SPACE_XS, BUTTON_GAP),
         )
         bottom.grid_columnconfigure(0, weight=1)
 
@@ -167,8 +283,8 @@ class SybilView:
 
     # ─────────────────────────────── CARD HELPER ─────────────────────────
 
-    def _card(self, title: str, builder) -> None:
-        frame = ctk.CTkFrame(self.container)
+    def _card(self, title: str, builder, parent) -> None:
+        frame = ctk.CTkFrame(parent)
         frame.pack(fill="x", pady=CARD_PAD_Y, padx=CARD_PAD_X)
 
         ctk.CTkLabel(frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(
@@ -329,14 +445,16 @@ class SybilView:
 
     # ─────────────────────────────── OVERLAY CONTROL ─────────────────────
 
-    def _show_overlay(self) -> None:
+    def _show_overlay(self, batch_mode=False) -> None:
         self._running = True
         self.run_button.configure(state="disabled")
         self._set_widgets_state("disabled")
 
         # reset overlay to initial state
         self._overlay.show(
-            title="Running model...", stage="Preparing inference pipeline"
+            title="Running model...",
+            stage="Preparing inference pipeline",
+            batch_mode=batch_mode,
         )
 
     def _hide_overlay(self) -> None:
@@ -385,8 +503,43 @@ class SybilView:
             self._emit("log", str(exc), "ERROR")
             return
 
-        self._show_overlay()
         self.controller.run(data)
+
+    def _on_batch_submit(self) -> None:
+        if self._running:
+            return
+
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+
+        if not file_path:
+            return
+
+        self._emit("log", f"Selected batch file: {file_path}")
+
+        self._overlay.set_cancel_callback(self.controller.cancel_batch)
+
+        self.controller.run_batch(file_path)
+
+    def _on_mode_changed(self, _=None) -> None:
+        mode = self._mode_var.get()
+
+        if mode == "single":
+            self._batch_frame.pack_forget()
+            self._single_frame.pack(fill="both", expand=True)
+
+            self.run_button.grid()
+
+            self._subtitle.configure(
+                text="Enter patient information to compute risk score"
+            )
+
+        else:
+            self._single_frame.pack_forget()
+            self._batch_frame.pack(fill="both", expand=True)
+
+            self.run_button.grid_remove()
+
+            self._subtitle.configure(text="Run Sybil inference across a CSV batch")
 
     def reset(self) -> None:
         """Clear all inputs and results — called by new_run action."""
@@ -550,6 +703,15 @@ class SybilView:
             value = max(0.0, min(1.0, event.value or 0.0))
             self._overlay.set_progress(value)
 
+        elif event.type == "batch_progress":
+            current = event.data["current"]
+            total = event.data["total"]
+            self._overlay.set_batch_progress(
+                current,
+                total,
+            )
+            self._overlay.set_stage(f"Running patient {current} of {total}")
+
         elif event.type == "log":
             if self._running and event.message:
                 # Forward every log line to the overlay's live feed
@@ -562,13 +724,20 @@ class SybilView:
                         break
 
         elif event.type == "ui_state":
-            if event.message == "running":
-                self._show_overlay()
+            if event.message == "running_single":
+                self._show_overlay(batch_mode=False)
+
+            elif event.message == "running_batch":
+                self._show_overlay(batch_mode=True)
+
             elif event.message in ("idle", "error"):
                 self._hide_overlay()
 
         elif event.type == "result":
-            if event.data:
+            if isinstance(event.data, dict) and "output_path" in event.data:
+                self._show_results(f"Batch complete:\n{event.data['output_path']}")
+                # self._hide_overlay()
+            elif event.data:
                 yearly = event.data.get("yearly", [])
                 epi = event.data.get("epi", 0.0)
                 lines = [f"Year {i + 1}: {v:.1%}" for i, v in enumerate(yearly)]

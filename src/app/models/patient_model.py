@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Dict, Optional
 
 from app.config.settings import PROJECT_ROOT
 
@@ -24,3 +25,37 @@ class SybilInputData:
 class RiskResult:
     yearly_scores: list[float]
     epi_score: float
+
+
+@dataclass
+class IntegralClinicalData:
+    epi_age: int
+    epi_female: int
+    epi_fhlc: int
+    epi_copdemph: int
+    epi_formersmk: int
+    epi_duration: float
+    epi_cigday: float
+    epi_quittime: float
+    epi_bmi: float
+
+    study: str | None = None
+    pid: str | None = None
+    nid: str | None = None
+
+
+@dataclass
+class RadiomicsFeatures:
+    features: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class IntegralRadiomicsInput:
+    clinical: IntegralClinicalData
+    radiomics: RadiomicsFeatures
+
+
+@dataclass
+class IntegralRiskResult:
+    benign_probability: float
+    malignant_probability: float

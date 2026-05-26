@@ -7,9 +7,14 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
+import pandas as pd
+
 from app.controllers.base_controller import BaseController
+from app.models.patient_model import SybilInputData
 from app.utils.event_bus import AppEvent, EventBus
+from app.utils.helpers import validate_ct_path
 from app.utils.sybil_epi import calculate_sybil_epi_score, epi_input_from_patient_data
+from app.utils.sybil_inference import run_sybil_pipeline
 
 
 class SybilController(BaseController):
@@ -18,13 +23,15 @@ class SybilController(BaseController):
         self._model = None
         self._pending = None
         self._infer_active = False
+        self._batch_active = False
+        self._batch_cancel = False
 
     def load_model(self):
         self._log("Loading Sybil model...")
 
         def _task():
             try:
-                import torch
+                import torch  # noqa: PLC0415
 
                 torch.set_num_threads(2)
                 torch.set_num_interop_threads(1)
@@ -32,7 +39,7 @@ class SybilController(BaseController):
                 os.environ["CUDA_VISIBLE_DEVICES"] = ""
                 # lazy import — runs off main thread so GIL contention
                 # during import doesn't block the UI
-                from sybil import Sybil
+                from sybil import Sybil  # noqa: PLC0415
 
                 self._model = Sybil("sybil_ensemble")
                 self._log("Sybil model ready.", "SUCCESS")
@@ -53,13 +60,13 @@ class SybilController(BaseController):
             self._error("Invalid CT folder.")
             return
 
-        dicoms = sorted(path.glob("*.dcm"))
+        dicoms = sorted(path.glob("*.*"))
         if not dicoms:
-            self._error("No DICOM files found.")
+            self._error("No files found.")
             return
 
         self._pending = data
-        self._set_state("running")
+        self._set_state("running_single")
         self._log(f"Running Sybil on {len(dicoms)} slices…")
         self._progress(0.2)
 
@@ -70,6 +77,16 @@ class SybilController(BaseController):
             daemon=True,
         ).start()
         threading.Thread(target=self._heartbeat, daemon=True).start()
+
+    def run_batch(self, csv_path: str) -> None:
+        thread = threading.Thread(
+            target=self._run_batch_worker, args=(csv_path,), daemon=True
+        )
+        thread.start()
+
+    def cancel_batch(self):
+        self._batch_cancel = True
+        self._log("Cancelling batch...", "WARNING")
 
     def _heartbeat(self) -> None:
         elapsed = 0
@@ -84,7 +101,7 @@ class SybilController(BaseController):
 
     def _infer(self, paths: list[str]) -> None:
         try:
-            from sybil.serie import Serie  # lazy import
+            from sybil.serie import Serie  # lazy import  # noqa: PLC0415
 
             serie = Serie(paths)
             prediction = self._model.predict([serie])
@@ -114,3 +131,117 @@ class SybilController(BaseController):
             )
         )
         self._set_state("idle")
+
+    def _row_to_patient(self, row) -> SybilInputData:
+        def get(key, default=""):
+            return row.get(key, default)
+
+        return SybilInputData(
+            age=float(get("age", 0)),
+            bmi=float(get("bmi", 0)),
+            copd=int(get("copd", 0)),
+            education=int(get("education", 1)),
+            ethnicity=int(get("ethnicity", 1)),
+            family_lc_history=int(get("family_lc_history", 0)),
+            personal_cancer_history=int(get("personal_cancer_history", 0)),
+            smoking_duration=float(get("smoking_duration", 0)),
+            smoking_intensity=float(get("smoking_intensity", 0)),
+            smoking_quit_time=float(get("smoking_quit_time", 0)),
+            smoking_status=int(get("smoking_status", 0)),
+            ct_scan_dir=get("ct_scan_dir"),
+            six_year_risk=float(get("six_year_risk")) if get("six_year_risk") else None,
+        )
+
+    def _run_batch_worker(self, csv_path: str) -> None:
+        try:
+            self._batch_active = True
+            self._batch_cancel = False
+
+            df = pd.read_csv(csv_path)
+            results = []
+
+            total = len(df)
+
+            self._set_state("running_batch")
+            self._log(f"Starting batch run: {total} patients")
+
+            for i, row in df.iterrows():
+                self._emit(
+                    AppEvent(
+                        type="batch_progress",
+                        data={
+                            "current": i + 1,
+                            "total": total,
+                        },
+                    )
+                )
+                self._log(f"Completed {i}/{total}")
+
+                if self._batch_cancel:
+                    self._log("Batch cancelled by user", "WARNING")
+
+                    remaining = total - len(results)
+
+                    results.extend(
+                        [{"epi": None, "error": "cancelled"} for _ in range(remaining)]
+                    )
+                    break
+
+                try:
+                    patient = self._row_to_patient(row)
+
+                    path = Path(patient.ct_scan_dir)
+
+                    ok, msg = validate_ct_path(path)
+                    if not ok:
+                        self._warn(f"Row {i + 1} skipped: {msg}")
+                        results.append(
+                            {
+                                "epi": None,
+                                "error": msg,
+                            }
+                        )
+                        continue
+
+                    self._log(f"Running inference on row {i + 1} for patient: ")
+                    self._log(json.dumps(asdict(patient)))
+
+                    epi = run_sybil_pipeline(self._model, patient)
+
+                    results.append(
+                        {
+                            "epi": epi,
+                            "error": None,
+                        }
+                    )
+
+                except Exception as e:
+                    import traceback
+
+                    self._error(f"Row {i + 1} failed: {e}")
+                    self._error(traceback.format_exc())
+                    results.append(
+                        {
+                            "epi": None,
+                            "error": str(e),
+                        }
+                    )
+
+            df["epi_risk"] = [r["epi"] for r in results]
+            df["error"] = [r["error"] for r in results]
+
+            output_path = str(Path(csv_path).with_suffix(""))
+            output_path = output_path + "_scored.csv"
+
+            df.to_csv(output_path, index=False)
+
+            self._batch_active = False
+            self._set_state("idle")
+
+            self._emit(AppEvent(type="result", data={"output_path": output_path}))
+        except Exception as e:
+            import traceback
+
+            self._error("Batch crashed completely")
+            self._error(str(e))
+            self._error(traceback.format_exc())

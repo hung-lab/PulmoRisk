@@ -36,4 +36,6 @@ class MenuBarController(BaseController):
 
     def _handle_event(self, event) -> None:
         if event.type == "ui_state" and self._menu_bar:
-            self._menu_bar.set_enabled(event.message not in ("running",))
+            self._menu_bar.set_enabled(
+                event.message not in ("running", "running_single", "running_batch")
+            )

@@ -4,11 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tkinter-app"
-version = "1.1.2"
+version = "1.1.5"
 description = "A custom tkinter application"
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "customtkinter>=5.2.0",
+    "pandas>=2.3.3",
     "Pillow>=12.2.0",
     "sybil @ git+https://github.com/reginabarzilaygroup/Sybil.git@v1.6.0",
     "torch==1.13.1+cpu",

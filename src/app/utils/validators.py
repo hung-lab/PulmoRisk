@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ValidationResult:
-    value: float | str | None
+    value: float | int | str | None
     errors: list[str]
 
 
@@ -60,3 +60,65 @@ class SybilValidator:
             errors += cls.range(num, name, min_v, max_v)
 
         return num, errors
+
+
+class IntegralValidator(SybilValidator):
+    # ───────────────────────────── INT VALIDATION ─────────────────────────
+
+    @staticmethod
+    def to_int(value: str, name: str) -> ValidationResult:
+        try:
+            return ValidationResult(int(value), [])
+        except ValueError:
+            return ValidationResult(None, [f"{name} must be an integer"])
+
+    # ───────────────────────────── BINARY VALIDATION ──────────────────────
+
+    @staticmethod
+    def binary(value: str, name: str) -> ValidationResult:
+        try:
+            v = int(value)
+            if v not in (0, 1):
+                return ValidationResult(None, [f"{name} must be 0 or 1"])
+            return ValidationResult(v, [])
+        except ValueError:
+            return ValidationResult(None, [f"{name} must be 0 or 1"])
+
+    # ───────────────────────────── DICT VALIDATION (RADIO) ────────────────
+
+    @staticmethod
+    def validate_radiomics(features: dict) -> list[str]:
+        """
+        Ensures radiomics payload is safe for R model.
+        """
+        errors = []
+
+        if not isinstance(features, dict):
+            return ["Radiomics must be a JSON object"]
+
+        if len(features) == 0:
+            return ["Radiomics features cannot be empty"]
+
+        for k, v in features.items():
+            if v is None:
+                errors.append(f"{k} is missing")
+                continue
+
+            try:
+                float(v)
+            except Exception:
+                errors.append(f"{k} must be numeric")
+
+        return errors
+
+    # ───────────────────────────── FULL PIPELINE HELPERS ──────────────────
+
+    @classmethod
+    def clinical_field(
+        cls,
+        value: str,
+        name: str,
+        min_v: float | None = None,
+        max_v: float | None = None,
+    ):
+        return cls.validate_field(value, name, min_v, max_v)

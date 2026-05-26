@@ -2,7 +2,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-__version__ = "1.1.2"
+__version__ = "1.1.5"
 __build_date__ = "2026-05-06"
 __author__ = ""
 
@@ -19,6 +19,7 @@ SUCCESS_COLOUR = (PRIMARY_LIGHT, "#9BE7B1")
 BORDER_COLOUR = (BORDER_LIGHT, BORDER_DARK)
 ERROR_COLOUR = (ACCENT_LIGHT, ACCENT_DARK)
 WARNING_COLOUR = ("#FF5a5f", ACCENT_DARK)
+WARNING_COLOUR_HOVER=(ACCENT_DARK, "#FF5a5f")
 
 # Colour per log level — mirrors LogPanel's palette
 LEVEL_COLOURS: dict[str, tuple[str, str]] = {

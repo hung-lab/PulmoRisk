@@ -29,7 +29,7 @@ import datetime
 
 import customtkinter as ctk
 
-from app.config.settings import LEVEL_COLOURS, LEVEL_PREFIX
+from app.config.settings import ERROR_COLOUR, LEVEL_COLOURS, LEVEL_PREFIX
 from app.utils.ui_config import SPACE_LG, SPACE_MD, SPACE_SM
 
 _MAX_LINES = 6  # how many log lines to keep visible at once
@@ -49,12 +49,15 @@ class RunningOverlay:
         self._parent = parent
         self._visible = False
         self._elapsed = 0
+        self._cancel_callback = None
 
         self._build()
 
     # ── public API ────────────────────────────────────────────────────────
 
-    def show(self, title: str = "Running…", stage: str = "Preparing…") -> None:
+    def show(
+        self, title: str = "Running…", stage: str = "Preparing…", batch_mode=False
+    ) -> None:
         """Lift the overlay and start the animation + elapsed timer."""
         self._visible = True
         self._elapsed = 0
@@ -72,6 +75,11 @@ class RunningOverlay:
         self._bar.configure(mode="indeterminate")
         self._bar.start()
 
+        if batch_mode:
+            self.enable_batch_mode()
+        else:
+            self.disable_batch_mode()
+
         self._frame.lift()
         self._tick()
 
@@ -79,7 +87,21 @@ class RunningOverlay:
         """Lower the overlay and stop the animation."""
         self._visible = False
         self._bar.stop()
+        self.disable_batch_mode()
         self._frame.lower()
+
+    def enable_batch_mode(self):
+        self._batch_bar.set(0)
+        self._batch_label.configure(text="0 / 0 patients")
+
+        self._cancel_btn.configure(
+            text="Cancel Batch",
+            state="normal",
+        )
+        self._batch_frame.pack(pady=(SPACE_MD, 0))
+
+    def disable_batch_mode(self):
+        self._batch_frame.pack_forget()
 
     def set_stage(self, text: str) -> None:
         """Update the stage subtitle (e.g. 'Running CT analysis…')."""
@@ -118,6 +140,18 @@ class RunningOverlay:
             self._bar.set(1.0)
             self._stage_label.configure(text="Complete!")
 
+    def set_batch_progress(self, current: int, total: int):
+        if total <= 0:
+            return
+
+        value = current / total
+
+        self._batch_bar.set(value)
+        self._batch_label.configure(text=f"{current} / {total} patients")
+
+    def set_cancel_callback(self, callback):
+        self._cancel_callback = callback
+
     @property
     def is_visible(self) -> bool:
         return self._visible
@@ -152,6 +186,26 @@ class RunningOverlay:
         self._bar.pack()
         self._bar.set(0)
 
+        self._batch_frame = ctk.CTkFrame(inner, fg_color="transparent", border_width=0)
+
+        self._batch_frame.pack(pady=(SPACE_MD, 0))
+
+        self._batch_label = ctk.CTkLabel(
+            self._batch_frame,
+            text="0 / 0 patients",
+            font=ctk.CTkFont(size=12),
+            text_color="gray60",
+        )
+        self._batch_label.pack()
+
+        self._batch_bar = ctk.CTkProgressBar(
+            self._batch_frame,
+            width=360,
+            height=10,
+            mode="determinate",
+        )
+        self._batch_bar.pack(pady=(4, SPACE_SM))
+
         self._elapsed_label = ctk.CTkLabel(
             inner,
             text="",
@@ -159,6 +213,15 @@ class RunningOverlay:
             text_color="gray60",
         )
         self._elapsed_label.pack(pady=(SPACE_SM, SPACE_MD))
+
+        self._cancel_btn = ctk.CTkButton(
+            self._batch_frame,
+            text="Cancel Batch",
+            width=140,
+            command=self._on_cancel,
+            fg_color=ERROR_COLOUR,
+        )
+        self._cancel_btn.pack()
 
         # ── live log feed ─────────────────────────────────────────────────
         self._log_box = ctk.CTkTextbox(
@@ -187,3 +250,14 @@ class RunningOverlay:
         self._elapsed_label.configure(text=text)
 
         self._parent.after(1000, self._tick)
+
+    def _on_cancel(self):
+        if self._cancel_callback:
+            self._cancel_callback()
+
+        self._stage_label.configure(text="Cancelling after current patient...")
+
+        self._cancel_btn.configure(
+            text="Cancelling...",
+            state="disabled",
+        )

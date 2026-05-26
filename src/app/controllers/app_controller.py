@@ -19,7 +19,7 @@ class AppController(BaseController):
                 self._split.toggle_right_panel()
 
         elif event.type == "ui_state":
-            if event.message == "running":
+            if event.message in ("running", "running_single", "running_batch"):
                 self._split.lock_tabs()
             elif event.message in ("idle", "error"):
                 self._split.unlock_tabs()

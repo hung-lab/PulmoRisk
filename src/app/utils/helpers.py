@@ -96,3 +96,13 @@ def center_window(
 def resource_path(*parts):
     base = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else PROJECT_ROOT
     return base.joinpath(*parts)
+
+
+def validate_ct_path(path: Path) -> tuple[bool, str]:
+    if not path.exists():
+        return False, "Path does not exist"
+    if not path.is_dir():
+        return False, "Not a directory"
+    if not any(path.iterdir()):
+        return False, "Directory is empty"
+    return True, ""
