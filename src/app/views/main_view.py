@@ -70,12 +70,12 @@ class MainWindow:
                 underline=True,
             )  # config BEFORE insert
             text.insert("end", label, tag)
-            text._textbox.tag_bind(tag, "<Button-1>", lambda e, u=url: open_url(u))
+            text._textbox.tag_bind(tag, "<Button-1>", lambda _, u=url: open_url(u))
             text._textbox.tag_bind(
-                tag, "<Enter>", lambda e: text._textbox.configure(cursor="hand2")
+                tag, "<Enter>", lambda _: text._textbox.configure(cursor="hand2")
             )
             text._textbox.tag_bind(
-                tag, "<Leave>", lambda e: text._textbox.configure(cursor="")
+                tag, "<Leave>", lambda _: text._textbox.configure(cursor="")
             )
 
         text.insert(
@@ -107,7 +107,7 @@ class MainWindow:
 
         text.insert(
             "end",
-            "Select a model from the tabs above to begin. Ensure a valid DICOM CT "
+            "Select a model from the tabs above to begin. Ensure a valid CT "
             "scan folder is available before running either model.",
         )
 

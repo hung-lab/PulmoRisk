@@ -51,32 +51,43 @@ class SybilController(BaseController):
         threading.Thread(target=_task, daemon=True).start()
 
     def run(self, data) -> None:
-        if not self._model:
-            self._error("Model not loaded.")
-            return
+        if data.six_year_risk:
+            self._pending = data
+            self._set_state("running")
+            self._log("Calculating sybil epi score")
+            self._progress(0.2)
+            threading.Thread(
+                target=self._on_complete,
+                args=([0, 0, 0, 0, 0, data.six_year_risk],),
+                daemon=True,
+            ).start()
+        else:
+            if not self._model:
+                self._error("Model not loaded.")
+                return
 
-        path = Path(data.ct_scan_dir)
-        if not path.is_dir():
-            self._error("Invalid CT folder.")
-            return
+            path = Path(data.ct_scan_dir)
+            if not path.is_dir():
+                self._error("Invalid CT folder.")
+                return
 
-        dicoms = sorted(path.glob("*.*"))
-        if not dicoms:
-            self._error("No files found.")
-            return
+            dicoms = sorted(path.glob("*.*"))
+            if not dicoms:
+                self._error("No files found.")
+                return
 
-        self._pending = data
-        self._set_state("running_single")
-        self._log(f"Running Sybil on {len(dicoms)} slices…")
-        self._progress(0.2)
+            self._pending = data
+            self._set_state("running_single")
+            self._log(f"Running Sybil on {len(dicoms)} slices…")
+            self._progress(0.2)
 
-        self._infer_active = True
-        threading.Thread(
-            target=self._infer,
-            args=([str(f) for f in dicoms],),
-            daemon=True,
-        ).start()
-        threading.Thread(target=self._heartbeat, daemon=True).start()
+            self._infer_active = True
+            threading.Thread(
+                target=self._infer,
+                args=([str(f) for f in dicoms],),
+                daemon=True,
+            ).start()
+            threading.Thread(target=self._heartbeat, daemon=True).start()
 
     def run_batch(self, csv_path: str) -> None:
         thread = threading.Thread(
