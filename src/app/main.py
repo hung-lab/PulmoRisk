@@ -3,12 +3,11 @@
 import platform
 import sys
 
-from app.controllers.integral_controller import IntegralController
-from app.views.integral_view import IntegralView
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
 from app.controllers.app_controller import AppController
+from app.controllers.integral_controller import IntegralController
 from app.controllers.menubar_controller import MenuBarController
 from app.controllers.sybil_controller import SybilController
 from app.utils.event_bus import EventBus
@@ -16,6 +15,7 @@ from app.utils.helpers import center_window, get_mono_font, resource_path
 from app.views.components.log_panel import LogPanel
 from app.views.components.menu_bar import MenuBar
 from app.views.components.split_view import SplitView
+from app.views.integral_view import IntegralView
 from app.views.main_view import MainWindow
 from app.views.splash_screen import SplashScreen
 from app.views.sybil_view import SybilView
@@ -78,7 +78,7 @@ def main() -> None:
     root = ctk.CTk()
 
     root.option_add("*Font", get_mono_font())
-    root.title("CustomTkinter App")
+    root.title("PulmoRisk")
     _set_icon(root)
     center_window(root, fraction=0.9)
 

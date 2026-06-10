@@ -24,11 +24,19 @@ RUN apt-get update && apt-get install -y \
   libxml2-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# Step 2: CRAN packages not in debian repo
-RUN Rscript -e "install.packages(c('parsnip', 'recipes', 'workflows', 'vetiver', 'bundle'), repos='https://cloud.r-project.org', Ncpus=4)"
+# Step 2: Install required R packages
+RUN Rscript -e "install.packages('Rapp')"
+RUN Rscript -e "install.packages('pak', repos='https://cloud.r-project.org')"
+RUN Rscript -e "pak::pak('mattwarkentin/INTEGRAL-Radiomics')"
 
 # Step 3: verify
-RUN Rscript -e "library(parsnip); library(recipes); library(workflows); library(glmnet); library(vetiver); library(jsonlite); cat('R OK\n')"
+RUN Rscript -e "library(pak); packageVersion('pak'); cat('R OK\n')"
+
+# Add `Rapp` to PATH
+RUN Rscript -e "Rapp::install_pkg_cli_apps('Rapp')"
+
+# Add `integral-radiomics` CLI to PATH
+RUN Rscript -e "integralrad::install_integralrad_cli()"
 
 WORKDIR /app
 
@@ -46,14 +54,17 @@ RUN uv run python -c "import app; print('APP OK:', app.__file__)"
 
 # Verify R packages installed correctly
 RUN Rscript -e "cat(R.version\$major, R.version\$minor, '\n')"
-RUN Rscript -e "library(parsnip); library(recipes); library(workflows); library(glmnet); library(vetiver); library(jsonlite); cat('R OK\n')"
+RUN Rscript -e "library(Rapp); library(integralrad); cat('R OK\n')"
 
 RUN useradd --create-home --shell /bin/bash appuser \
   && mkdir -p /app/build /app/dist /app/tmp \
   && chown -R appuser:appuser /app
 
-ENV TMPDIR=/app/tmp
+
 
 USER appuser
+
+ENV PATH="/home/appuser/.local/bin:${PATH}"
+ENV TMPDIR=/app/tmp
 
 #ENTRYPOINT ["uv", "run", "tkinter-app"]

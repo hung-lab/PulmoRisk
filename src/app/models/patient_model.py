@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.config.settings import PROJECT_ROOT
 
@@ -42,16 +42,13 @@ class IntegralClinicalData:
     pid: str | None = None
     nid: str | None = None
 
-
-@dataclass
-class RadiomicsFeatures:
-    features: dict[str, float] = field(default_factory=dict)
+    image_file: str | None = None
+    mask_file: str | None = None
 
 
 @dataclass
 class IntegralRadiomicsInput:
     clinical: IntegralClinicalData
-    radiomics: RadiomicsFeatures
 
 
 @dataclass

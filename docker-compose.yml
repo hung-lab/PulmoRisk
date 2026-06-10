@@ -4,9 +4,9 @@ services:
       context: .
       # optional: name the image so Docker reuses the layer cache
       cache_from:
-        - tkinter-app:latest
-    image: tkinter-app:latest
-    container_name: tkinter-app-dev
+        - PulmoRisk:latest
+    image: PulmoRisk:latest
+    container_name: PulmoRisk-dev
     volumes:
       - .:/app
     environment:
@@ -17,8 +17,8 @@ services:
     tty: true
 
   shell:
-    image: tkinter-app:latest
-    container_name: tkinter-app-shell
+    image: PulmoRisk:latest
+    container_name: PulmoRisk-shell
     volumes:
       - .:/app
     environment:

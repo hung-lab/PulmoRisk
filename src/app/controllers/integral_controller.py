@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
 import subprocess
 import threading
 from typing import TYPE_CHECKING
 
 from app.controllers.base_controller import BaseController
 from app.utils.event_bus import AppEvent
-from app.utils.helpers import resource_path
 
 if TYPE_CHECKING:
     from app.models.patient_model import IntegralRadiomicsInput
@@ -19,10 +17,6 @@ class IntegralController(BaseController):
 
         self._pending = None
         self._running = False
-
-        # path to R model + script
-        self._model_path = resource_path("models", "INTEGRAL-Radiomics.rds")
-        self._r_script = resource_path("utils", "integral_predict.R")
 
     # ─────────────────────────────── RUN ───────────────────────────────
 
@@ -40,19 +34,23 @@ class IntegralController(BaseController):
     def _infer(self) -> None:
         try:
             payload = self._prepare_payload(self._pending)
-            with open("/tmp/input.json", "w") as f:
-                json.dump(payload, f)
-            # input_json = json.dumps([payload])
-            # print(input_json)
 
             cmd = [
-                "Rscript",
-                self._r_script,
-                self._model_path,
-                "/tmp/input.json",
+                "integral-radiomics",
+                f"--image={payload['image']}",
+                f"--mask={payload['mask']}",
+                f"--age={int(payload['epi_age'])}",
+                f"--sex={1 if payload['epi_female'] else 0}",
+                f"--fhlc={int(payload['epi_fhlc'])}",
+                f"--copdemph={int(payload['epi_copdemph'])}",
+                f"--formersmk={int(payload['epi_formersmk'])}",
+                f"--duration={int(payload['epi_duration'])}",
+                f"--cigday={int(payload['epi_cigday'])}",
+                f"--quittime={int(payload['epi_quittime'])}",
+                f"--bmi={float(payload['epi_bmi'])}",
             ]
 
-            self._log("Calling R subprocess...")
+            self._log("Calling integral-radiomics R CLI subprocess...")
 
             result = subprocess.run(
                 cmd,
@@ -62,33 +60,19 @@ class IntegralController(BaseController):
             )
 
             if result.returncode != 0:
-                self._error(f"R process failed: {result.stderr}")
+                self._error(f"integral-radiomics process failed: {result.stderr}")
                 return
 
             stdout = result.stdout.strip()
-            try:
-                output = json.loads(stdout)
-            except json.JSONDecodeError:
-                raise RuntimeError(f"Invalid JSON from R:\n{stdout[:1000]}")
-            self._log(f"Result of running R Process {output}", "INFO")
 
-            # Check if R returned a graceful missing-columns error
-            if "error" in output:
-                missing = output.get("missing", [])
-                self._log(
-                    f"Missing {len(missing)} required features. First 5: {missing[:5]}",
-                    "ERROR",
-                )
-                # Write missing cols to log so user can see them
-                self._log("Full list written to /tmp/required_cols.json", "WARNING")
-                raise ValueError(f"Missing required radiomics features: {missing[:5]}")
+            self._log(f"result is: {stdout}")
 
             self._progress(0.8)
 
-            self._on_complete(output)
+            self._on_complete(stdout)
 
         except subprocess.CalledProcessError as e:
-            self._error(f"R process failed: {e.stderr}")
+            self._error(f"integral-radiomics process failed: {e.stderr}")
 
         except Exception as exc:
             self._error(f"Inference error: {exc}")
@@ -97,7 +81,7 @@ class IntegralController(BaseController):
     # ─────────────────────────────── DATA PREP ─────────────────────────
 
     def _prepare_payload(self, data: IntegralRadiomicsInput) -> dict:
-        clinical = {
+        return {
             "epi_age": data.clinical.epi_age,
             "epi_female": data.clinical.epi_female,
             "epi_fhlc": data.clinical.epi_fhlc,
@@ -110,30 +94,26 @@ class IntegralController(BaseController):
             "study": data.clinical.study,
             "pid": data.clinical.pid,
             "nid": data.clinical.nid,
+            "image": data.clinical.image_file,
+            "mask": data.clinical.mask_file,
         }
-
-        radiomics = data.radiomics.features or {}
-
-        return {**clinical, **radiomics}
 
     # ─────────────────────────────── RESULT ─────────────────────────────
 
-    def _on_complete(self, result: dict) -> None:
-        benign = float(result.get(".pred_0", 0))
-        malignant = float(result.get(".pred_1", 0))
+    def _on_complete(self, result: str) -> None:
+        lung_cancer_prob = float(result)
 
         self._log(
-            f"Prediction → benign={benign:.3f}, malignant={malignant:.3f}", "SUCCESS"
+            f"Prediction → lung cancer probability={lung_cancer_prob:.3f}", "SUCCESS"
         )
 
         self._progress(1.0)
 
         self._emit(
             AppEvent(
-                type="result",
+                type="radiomics_result",
                 data={
-                    "benign": benign,
-                    "malignant": malignant,
+                    "probability": lung_cancer_prob,
                 },
             )
         )

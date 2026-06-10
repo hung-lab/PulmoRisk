@@ -137,7 +137,7 @@ class SybilController(BaseController):
         self._log(f"Final 6-year risk: {epi:.1%}", "SUCCESS")
         self._emit(
             AppEvent(
-                type="result",
+                type="sybil_result",
                 data={"yearly": list(yearly), "epi": epi},
             )
         )
@@ -249,7 +249,7 @@ class SybilController(BaseController):
             self._batch_active = False
             self._set_state("idle")
 
-            self._emit(AppEvent(type="result", data={"output_path": output_path}))
+            self._emit(AppEvent(type="sybil_result", data={"output_path": output_path}))
         except Exception as e:
             import traceback
 

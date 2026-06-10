@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import contextlib
 import tkinter as tk
+from functools import partial
+from tkinter import filedialog
 from typing import TYPE_CHECKING
 
-from app.config.settings import BORDER_COLOUR, ERROR_COLOUR
-from app.utils.event_bus import AppEvent
 import customtkinter as ctk
 
+from app.config.settings import BORDER_COLOUR, ERROR_COLOUR
 from app.models.patient_model import (
     IntegralClinicalData,
     IntegralRadiomicsInput,
-    RadiomicsFeatures,
 )
+from app.utils.event_bus import AppEvent
 from app.utils.ui_config import (
     BUTTON_GAP,
     CARD_PAD_X,
@@ -32,216 +33,12 @@ from app.views.components.loading_overlay import RunningOverlay
 if TYPE_CHECKING:
     from app.controllers.integral_controller import IntegralController
 
-import json
 
 # ─────────────────────────────── OPTIONS ───────────────────────────────
 
 SEX_OPTIONS = {
     "Male": 0,
     "Female": 1,
-}
-
-_SAMPLE_FEATURES = {
-  "epi_age": 67,
-  "epi_female": 0,
-  "epi_fhlc": 1,
-  "epi_copdemph": 0,
-  "epi_formersmk": 1,
-  "epi_duration": 38,
-  "epi_cigday": 18,
-  "epi_quittime": 6,
-  "epi_bmi": 27.4,
-
-  "original_shape_Elongation": 0.71,
-  "original_shape_Flatness": 0.43,
-  "original_shape_LeastAxisLength": 12.8,
-  "original_shape_Sphericity": 0.84,
-
-  "original_firstorder_10Percentile": -812.5,
-  "original_firstorder_Kurtosis": 3.92,
-  "original_firstorder_Maximum": 245.7,
-  "original_firstorder_MeanAbsoluteDeviation": 84.2,
-  "original_firstorder_Mean": -523.8,
-  "original_firstorder_Minimum": -1024.0,
-  "original_firstorder_Range": 1269.7,
-  "original_firstorder_Skewness": -0.61,
-
-  "original_glcm_ClusterShade": -1240.5,
-  "original_glcm_ClusterTendency": 18.4,
-  "original_glcm_DifferenceAverage": 1.92,
-  "original_glcm_Idm": 0.83,
-  "original_glcm_Idn": 0.91,
-  "original_glcm_Imc1": -0.37,
-  "original_glcm_Imc2": 0.82,
-  "original_glcm_InverseVariance": 0.24,
-  "original_glcm_MCC": 0.74,
-
-  "original_glrlm_GrayLevelNonUniformity": 152.7,
-  "original_glrlm_LongRunLowGrayLevelEmphasis": 0.0042,
-  "original_glrlm_RunEntropy": 4.82,
-  "original_glrlm_RunPercentage": 0.31,
-  "original_glrlm_ShortRunLowGrayLevelEmphasis": 0.87,
-
-  "original_glszm_GrayLevelNonUniformity": 138.4,
-  "original_glszm_HighGrayLevelZoneEmphasis": 22.5,
-  "original_glszm_ZonePercentage": 0.18,
-
-  "original_gldm_DependenceNonUniformityNormalized": 0.14,
-  "original_gldm_LargeDependenceEmphasis": 12.9,
-  "original_gldm_LargeDependenceHighGrayLevelEmphasis": 45.7,
-  "original_gldm_LargeDependenceLowGrayLevelEmphasis": 0.0061,
-
-  "original_ngtdm_Busyness": 1.84,
-  "original_ngtdm_Complexity": 324.5,
-  "original_ngtdm_Contrast": 0.027,
-  "original_ngtdm_Strength": 0.92,
-  "original_ngtdm_Coarseness": 0.0048,
-
-  "wavelet-LLH_firstorder_10Percentile": -645.2,
-  "wavelet-LLH_firstorder_Maximum": 312.8,
-  "wavelet-LLH_firstorder_MeanAbsoluteDeviation": 73.1,
-  "wavelet-LLH_firstorder_Mean": -401.5,
-
-  "wavelet-LLH_glcm_ClusterProminence": 1840.2,
-  "wavelet-LLH_glcm_ClusterTendency": 14.6,
-  "wavelet-LLH_glcm_DifferenceAverage": 2.11,
-  "wavelet-LLH_glcm_Idm": 0.79,
-  "wavelet-LLH_glcm_Idn": 0.88,
-  "wavelet-LLH_glcm_Imc1": -0.41,
-  "wavelet-LLH_glcm_Imc2": 0.76,
-  "wavelet-LLH_glcm_InverseVariance": 0.19,
-  "wavelet-LLH_glcm_MCC": 0.69,
-
-  "wavelet-LLH_glrlm_GrayLevelNonUniformity": 164.3,
-  "wavelet-LLH_glrlm_LongRunLowGrayLevelEmphasis": 0.0031,
-  "wavelet-LLH_glrlm_RunEntropy": 5.02,
-  "wavelet-LLH_glrlm_RunPercentage": 0.27,
-  "wavelet-LLH_glrlm_RunVariance": 8.6,
-  "wavelet-LLH_glrlm_ShortRunLowGrayLevelEmphasis": 0.81,
-
-  "wavelet-LLH_glszm_GrayLevelNonUniformity": 142.8,
-  "wavelet-LLH_glszm_ZonePercentage": 0.22,
-
-  "wavelet-LLH_gldm_DependenceNonUniformityNormalized": 0.17,
-  "wavelet-LLH_gldm_LargeDependenceEmphasis": 10.8,
-  "wavelet-LLH_gldm_LargeDependenceHighGrayLevelEmphasis": 39.2,
-
-  "wavelet-LLH_ngtdm_Busyness": 2.12,
-  "wavelet-LLH_ngtdm_Contrast": 0.033,
-  "wavelet-LLH_ngtdm_Strength": 0.81,
-  "wavelet-LLH_ngtdm_Coarseness": 0.0039,
-
-  "wavelet-LHL_firstorder_10Percentile": -688.1,
-  "wavelet-LHL_firstorder_Kurtosis": 4.15,
-  "wavelet-LHL_firstorder_Maximum": 287.2,
-  "wavelet-LHL_firstorder_MeanAbsoluteDeviation": 69.7,
-  "wavelet-LHL_firstorder_Mean": -437.9,
-  "wavelet-LHL_firstorder_Minimum": -1011.0,
-  "wavelet-LHL_firstorder_Range": 1298.2,
-  "wavelet-LHL_firstorder_Skewness": -0.42,
-
-  "wavelet-LHL_glcm_ClusterProminence": 1721.4,
-  "wavelet-LHL_glcm_ClusterTendency": 16.1,
-  "wavelet-LHL_glcm_DifferenceAverage": 1.88,
-  "wavelet-LHL_glcm_Idm": 0.82,
-  "wavelet-LHL_glcm_Idn": 0.89,
-  "wavelet-LHL_glcm_Imc1": -0.39,
-  "wavelet-LHL_glcm_Imc2": 0.79,
-  "wavelet-LHL_glcm_InverseVariance": 0.22,
-  "wavelet-LHL_glcm_MCC": 0.72,
-
-  "wavelet-LHL_glrlm_GrayLevelNonUniformity": 149.5,
-  "wavelet-LHL_glrlm_LongRunLowGrayLevelEmphasis": 0.0048,
-  "wavelet-LHL_glrlm_RunEntropy": 4.76,
-  "wavelet-LHL_glrlm_RunPercentage": 0.29,
-  "wavelet-LHL_glrlm_ShortRunLowGrayLevelEmphasis": 0.84,
-
-  "wavelet-LHL_glszm_GrayLevelNonUniformity": 136.7,
-  "wavelet-LHL_glszm_HighGrayLevelZoneEmphasis": 25.4,
-  "wavelet-LHL_glszm_ZonePercentage": 0.19,
-
-  "wavelet-LHL_gldm_DependenceNonUniformityNormalized": 0.16,
-  "wavelet-LHL_gldm_LargeDependenceEmphasis": 11.7,
-  "wavelet-LHL_gldm_LargeDependenceHighGrayLevelEmphasis": 42.1,
-  "wavelet-LHL_gldm_LargeDependenceLowGrayLevelEmphasis": 0.0054,
-
-  "wavelet-LHL_ngtdm_Busyness": 1.96,
-  "wavelet-LHL_ngtdm_Complexity": 341.2,
-  "wavelet-LHL_ngtdm_Contrast": 0.029,
-  "wavelet-LHL_ngtdm_Strength": 0.88,
-  "wavelet-LHL_ngtdm_Coarseness": 0.0042,
-
-  "log-sigma-1-0-mm-3D_firstorder_10Percentile": -590.4,
-  "log-sigma-1-0-mm-3D_firstorder_Kurtosis": 3.71,
-  "log-sigma-1-0-mm-3D_firstorder_Maximum": 201.6,
-  "log-sigma-1-0-mm-3D_firstorder_MeanAbsoluteDeviation": 62.5,
-  "log-sigma-1-0-mm-3D_firstorder_Mean": -410.7,
-  "log-sigma-1-0-mm-3D_firstorder_Minimum": -998.0,
-  "log-sigma-1-0-mm-3D_firstorder_Range": 1199.6,
-
-  "log-sigma-1-0-mm-3D_glcm_DifferenceAverage": 1.63,
-  "log-sigma-1-0-mm-3D_glcm_Idm": 0.86,
-  "log-sigma-1-0-mm-3D_glcm_Idn": 0.92,
-  "log-sigma-1-0-mm-3D_glcm_Imc1": -0.31,
-  "log-sigma-1-0-mm-3D_glcm_Imc2": 0.74,
-  "log-sigma-1-0-mm-3D_glcm_InverseVariance": 0.28,
-  "log-sigma-1-0-mm-3D_glcm_MCC": 0.77,
-
-  "square_firstorder_10Percentile": 22500.0,
-  "square_firstorder_Kurtosis": 5.12,
-  "square_firstorder_Maximum": 1048576.0,
-  "square_firstorder_Mean": 312450.8,
-  "square_firstorder_Minimum": 0.0,
-  "square_firstorder_Range": 1048576.0,
-  "square_firstorder_Skewness": 1.21,
-
-  "squareroot_firstorder_Kurtosis": 2.91,
-  "squareroot_firstorder_Maximum": 31.8,
-  "squareroot_firstorder_MeanAbsoluteDeviation": 5.4,
-  "squareroot_firstorder_Mean": 19.7,
-  "squareroot_firstorder_Minimum": 0.0,
-  "squareroot_firstorder_Range": 31.8,
-
-  "logarithm_firstorder_Kurtosis": 3.22,
-  "logarithm_firstorder_Maximum": 6.81,
-  "logarithm_firstorder_MeanAbsoluteDeviation": 0.92,
-  "logarithm_firstorder_Mean": 4.37,
-  "logarithm_firstorder_Minimum": 0.0,
-  "logarithm_firstorder_Range": 6.81,
-  "logarithm_firstorder_Skewness": -0.14,
-
-  "exponential_firstorder_Kurtosis": 6.45,
-  "exponential_firstorder_Maximum": 4821.6,
-  "exponential_firstorder_Mean": 714.2,
-  "exponential_firstorder_Minimum": 1.0,
-  "exponential_firstorder_Range": 4820.6,
-  "exponential_firstorder_Skewness": 1.94,
-
-  "gradient_firstorder_10Percentile": 4.2,
-  "gradient_firstorder_Kurtosis": 3.57,
-  "gradient_firstorder_Maximum": 198.4,
-  "gradient_firstorder_MeanAbsoluteDeviation": 18.7,
-  "gradient_firstorder_Mean": 41.5,
-  "gradient_firstorder_Minimum": 0.0,
-  "gradient_firstorder_Range": 198.4,
-  "gradient_firstorder_Skewness": 0.88,
-
-  "lbp-3D-m1_firstorder_10Percentile": 2.0,
-  "lbp-3D-m1_firstorder_Maximum": 255.0,
-  "lbp-3D-m1_firstorder_MeanAbsoluteDeviation": 41.6,
-  "lbp-3D-m1_firstorder_Mean": 118.3,
-  "lbp-3D-m1_firstorder_Minimum": 0.0,
-  "lbp-3D-m1_firstorder_Range": 255.0,
-  "lbp-3D-m1_firstorder_Skewness": 0.37,
-
-  "lbp-3D-k_firstorder_10Percentile": 1.0,
-  "lbp-3D-k_firstorder_Kurtosis": 2.84,
-  "lbp-3D-k_firstorder_Maximum": 255.0,
-  "lbp-3D-k_firstorder_MeanAbsoluteDeviation": 44.9,
-  "lbp-3D-k_firstorder_Mean": 126.8,
-  "lbp-3D-k_firstorder_Minimum": 0.0,
-  "lbp-3D-k_firstorder_Range": 255.0,
-  "lbp-3D-k_firstorder_Skewness": 0.12
 }
 
 
@@ -270,13 +67,15 @@ class IntegralView:
         self._pid_var = tk.StringVar(value="1")
         self._nid_var = tk.StringVar(value="1")
 
-        # ── radiomics (JSON-style input) ────────────────
-        self._radiomics_box: ctk.CTkTextbox | None = None
+        # ── files (image and mask scans) ────────────────
+        self._image_file_var = tk.StringVar(value="No file selected")
+        self._mask_file_var = tk.StringVar(value="No file selected")
 
         # ── errors ───────────────────────────────────────
         self._age_error = tk.StringVar()
         self._bmi_error = tk.StringVar()
-        self._rad_error = tk.StringVar()
+        self._image_file_error = tk.StringVar()
+        self._mask_file_error = tk.StringVar()
         self._smoking_duration_error_var = tk.StringVar()
         self._smoking_intensity_error_var = tk.StringVar()
         self._smoking_quit_time_error_var = tk.StringVar()
@@ -321,8 +120,7 @@ class IntegralView:
 
         self._card("Clinical Data", self._build_clinical)
         self._card("Smoking History", self._build_smoking)
-        self._card("Identifiers (optional)", self._build_ids)
-        self._card("Radiomics Features (JSON)", self._build_radiomics)
+        self._card("Image files", self._build_ct)
 
         # results card (hidden until a run completes)
         self._results_frame = ctk.CTkFrame(
@@ -419,29 +217,74 @@ class IntegralView:
             self._smoking_quit_time_error_var,
         )
 
-    def _build_ids(self, p):
-        self._entry(p, "study", "Study ID", self._study_var)
-        self._entry(p, "pid", "Patient ID", self._pid_var)
-        self._entry(p, "nid", "Nodule ID", self._nid_var)
+    def _build_ct(self, p: ctk.CTkFrame) -> None:
+        r = self._row(p)
+        self._label(r, "CT Image")
 
-    def _build_radiomics(self, p: ctk.CTkFrame) -> None:
-        self._radiomics_box = ctk.CTkTextbox(
-            p,
-            height=200,
-            wrap="none",
-            font=ctk.CTkFont(family="Courier", size=12),
-            border_width=2,
+        container = ctk.CTkFrame(
+            r, width=INPUT_WIDTH, fg_color="transparent", border_width=0
         )
-        self._radiomics_box.pack(fill="x", pady=SPACE_XS)
-        self._radiomics_box.insert("1.0", '{\n  "feature_name": value,\n  ...\n}')
+        container.grid(row=0, column=1, sticky="w")
+        container.grid_propagate(False)
+
+        # Path label
+        path_label = ctk.CTkLabel(
+            container, textvariable=self._image_file_var, anchor="w"
+        )
+        path_label.pack(fill="both", expand=True)
+
+        # Browse button (same row, new column)
+        browse_btn = ctk.CTkButton(
+            container,
+            text="Browse",
+            command=partial(self._browse, self._image_file_var, self._image_file_error),
+        )
+        browse_btn.pack(anchor="w", pady=(SPACE_XS, 0))
+
+        # Error row
+        err_row = self._row(p)
 
         error = ctk.CTkLabel(
-            p,
-            textvariable=self._rad_error,
+            err_row,
+            textvariable=self._image_file_error,
             text_color=ERROR_COLOUR,
             font=ctk.CTkFont(size=12),
         )
-        error.pack(anchor="w", pady=(SPACE_XS, 0))
+        error.grid(row=0, column=1, sticky="w", pady=(SPACE_XS, 0))
+
+        r = self._row(p)
+        self._label(r, "CT Mask")
+
+        container = ctk.CTkFrame(
+            r, width=INPUT_WIDTH, fg_color="transparent", border_width=0
+        )
+        container.grid(row=0, column=1, sticky="w")
+        container.grid_propagate(False)
+
+        # Path label
+        path_label = ctk.CTkLabel(
+            container, textvariable=self._mask_file_var, anchor="w"
+        )
+        path_label.pack(fill="both", expand=True)
+
+        # Browse button (same row, new column)
+        browse_btn = ctk.CTkButton(
+            container,
+            text="Browse",
+            command=partial(self._browse, self._mask_file_var, self._mask_file_error),
+        )
+        browse_btn.pack(anchor="w", pady=(SPACE_XS, 0))
+
+        # Error row
+        err_row = self._row(p)
+
+        error = ctk.CTkLabel(
+            err_row,
+            textvariable=self._mask_file_error,
+            text_color=ERROR_COLOUR,
+            font=ctk.CTkFont(size=12),
+        )
+        error.grid(row=0, column=1, sticky="w", pady=(SPACE_XS, 0))
 
     # ─────────────────────────────── WIDGET FACTORIES ────────────────────
 
@@ -538,7 +381,14 @@ class IntegralView:
 
         _recurse(self.container)
 
-    # ─────────────────────────────── SUBMIT ──────────────────────────────
+    # ─────────────────────────────── ACTIONS ──────────────────────────────
+
+    def _browse(self, file_var, file_error) -> None:
+        file_path = filedialog.askopenfilename()
+        if file_path:
+            file_var.set(file_path)
+            file_error.set("")
+            self._emit("log", f"Selected file: {file_path}")
 
     def _on_submit(self):
         if self._running:
@@ -568,15 +418,16 @@ class IntegralView:
         self._bmi_var.set("")
         self._study_var.set("")
         self._pid_var.set("")
-        self._radiomics_box.delete("1.0", "end")
-        self._radiomics_box.insert("1.0", '{\n  "feature_name": value,\n  ...\n}')
+        self._image_file_var.set("No file selected")
+        self._mask_file_var.set("No file selected")
         self._clear_errors()
         self._results_frame.pack_forget()
 
     def _clear_errors(self) -> None:
         self._age_error.set("")
         self._bmi_error.set("")
-        self._rad_error.set("")
+        self._image_file_error.set("")
+        self._mask_file_error.set("")
         self._smoking_duration_error_var.set("")
         self._smoking_intensity_error_var.set("")
         self._smoking_quit_time_error_var.set("")
@@ -644,20 +495,20 @@ class IntegralView:
 
         # ───────────────────────── RADIOMICS ─────────────────────────
 
-        try:
-            raw = self._radiomics_box.get("1.0", "end").strip()
-            radiomics = json.loads(raw or "{}")
-            rad_errors = IntegralValidator.validate_radiomics(radiomics)
-        except Exception:
-            rad_errors = ["Radiomics must be valid JSON"]
-            radiomics = {}
+        ct_errors = []
+        image_error = ""
+        mask_error = ""
 
-        self._rad_error.set("\n".join(rad_errors))
+        if self._image_file_var.get() == "No file selected":
+            image_error = "Image file is required"
+            ct_errors.append(image_error)
 
-        if self._radiomics_box:
-            self._radiomics_box.configure(
-                border_color=ERROR_COLOUR if rad_errors else BORDER_COLOUR
-            )
+        if self._mask_file_var.get() == "No file selected":
+            mask_error = "Mask file is required"
+            ct_errors.append(mask_error)
+
+        self._image_file_error.set(image_error)
+        self._mask_file_error.set(mask_error)
 
         # ───────────────────────── BLOCK IF INVALID ─────────────────────────
         # ── collect all errors ──────────────────────
@@ -668,7 +519,7 @@ class IntegralView:
             + duration_errors
             + cigday_errors
             + quit_errors
-            + rad_errors
+            + ct_errors
         )
 
         if all_errors:
@@ -689,19 +540,18 @@ class IntegralView:
             study=self._study_var.get() or None,
             pid=self._pid_var.get() or None,
             nid=self._nid_var.get() or None,
+            image_file=self._image_file_var.get(),
+            mask_file=self._mask_file_var.get(),
         )
 
         return IntegralRadiomicsInput(
             clinical=clinical,
-            radiomics=RadiomicsFeatures(features=radiomics),
         )
 
     # ─────────────────────────────── RESULTS ─────────────────────────────
-    def _format_result(self, benign, malignant):
+    def _format_result(self, lung_cancer_prob):
         return {
-            "Benign": f"{benign:.1%}",
-            "Malignant": f"{malignant:.1%}",
-            "Decision": "Malignant" if malignant > 0.5 else "Benign",
+            "Lung Cancer Probabilty": f"{lung_cancer_prob:.1%}",
         }
 
     def _show_results(self, status_text: str) -> None:
@@ -737,15 +587,14 @@ class IntegralView:
                 self._hide_overlay()
 
         # ───────────────────────────── RESULT ───────────────────────────────
-        elif event.type == "result":
-            if not event.data or "benign" not in event.data:
+        elif event.type == "radiomics_result":
+            if not event.data or "probability" not in event.data:
                 return
 
-            benign = event.data.get("benign", 0.0)
-            malignant = event.data.get("malignant", 0.0)
+            lung_cancer_prob = event.data.get("probability", 0.0)
 
             # format display
-            result_dict = self._format_result(benign, malignant)
+            result_dict = self._format_result(lung_cancer_prob)
             lines = "\n".join(f"{k}: {v}" for k, v in result_dict.items())
             self._show_results(lines)
             self._hide_overlay()

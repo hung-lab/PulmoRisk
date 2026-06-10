@@ -733,7 +733,7 @@ class SybilView:
             elif event.message in ("idle", "error"):
                 self._hide_overlay()
 
-        elif event.type == "result":
+        elif event.type == "sybil_result":
             if isinstance(event.data, dict) and "output_path" in event.data:
                 self._show_results(f"Batch complete:\n{event.data['output_path']}")
                 # self._hide_overlay()

@@ -34,7 +34,7 @@ class MainWindow:
 
         ctk.CTkLabel(
             parent,
-            text="Lung Cancer Risk Modelling",
+            text="Lung Cancer Risk Estimation",
             font=ctk.CTkFont(size=20, weight="bold"),
             anchor="w",
         ).grid(
@@ -80,17 +80,20 @@ class MainWindow:
 
         text.insert(
             "end",
-            "This tool estimates an individual's lung cancer risk by combining "
-            "CT imaging analysis with clinical and epidemiological data. "
+            "This software tool implements two validated machine learning models, "
+            "which can estimate lung cancer risk based on low-dose CT (LDCT) images and clinical and epidemiologic factors."
             "Two validated models are available:\n\n",
         )
 
-        text.insert("end", "Sybil-EPI\n\n", "heading")
+        text.insert("end", "Sybil-Epi\n\n", "heading")
         text.insert(
             "end",
-            "Integrates deep learning-based CT scan analysis (Sybil) with patient "
-            "risk factors — including age, smoking history, and comorbidities — to "
-            "produce a calibrated 6-year risk probability. ",
+            "Sybil-Epi is a lung cancer risk prediction model that integrates key clinical and epidemiologic factors with deep learning model. "
+            "The analysis with Sybil-Epi requires only one single LDCT series, with no additional nodule annotation or segmentation, "
+            "combined with other 11 clinical risk factors, which are: age, BMI, education level, ethnicity, COPD history, "
+            "family lung cancer history, personal cancer history, smoking status, smoking duration, smoking intensity, "
+            "and smoking quit time.  "
+            "More information on Sybil-Epi can be a found at https://journal.chestnet.org/article/S0012-3692(26)00296-5/fulltext. ",
         )
         _add_link("View on GitHub", "https://github.com/hung-lab/Sybil-Epi")
         text.insert("end", "\n\n")
