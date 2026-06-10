@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.5...v1.2.0) (2026-06-10)
+
+
+### Features
+
+* add initial setup for integral radiomics and batch support for sybil ([24d0b27](https://github.com/hung-lab/Lung_cancer_risk_models/commit/24d0b276d6f121c3908991ea38c1d803a483a060))
+* implement integral radiomics ([6e62f84](https://github.com/hung-lab/Lung_cancer_risk_models/commit/6e62f842fc43e83e751af404b2b7bca20410a6f3))
+
+
+### Bug Fixes
+
+* attempt at fixing permissions issue with release please ([852c8d0](https://github.com/hung-lab/Lung_cancer_risk_models/commit/852c8d0901b5f3dd90fe8a65aebb5b65145f14a0))
+* bug related to sybil if user inputs six year risk ([f9d03f0](https://github.com/hung-lab/Lung_cancer_risk_models/commit/f9d03f0027f1aa4690296fd138f1564a076f2953))
+* release please permissions issue ([1885ce1](https://github.com/hung-lab/Lung_cancer_risk_models/commit/1885ce112bf35c07375038179a410701df5d67d9))
+
 ## [1.1.5](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.4...v1.1.5) (2026-05-06)
 
 
