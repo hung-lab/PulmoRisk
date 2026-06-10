@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.2.0...v1.2.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* syntax bug in release workflow as well as pin python version to 3.10 ([c85e557](https://github.com/hung-lab/Lung_cancer_risk_models/commit/c85e557fd8fa5b55ed21e4e264daf77aaacd282d))
+
 ## [1.2.0](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.1.5...v1.2.0) (2026-06-10)
 
 
