@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.2.1...v1.2.2) (2026-06-10)
+
+
+### Bug Fixes
+
+* checking for R installation ([08744bc](https://github.com/hung-lab/Lung_cancer_risk_models/commit/08744bc5d6cd7fcef2ef72f86c7fea483cc0f5b5))
+
 ## [1.2.1](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.2.0...v1.2.1) (2026-06-10)
 
 
