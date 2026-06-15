@@ -110,7 +110,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="lung",
+    name="pulmorisk",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,   # stripping torch .so files can break CUDA — leave False
@@ -127,5 +127,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="lung",
+    name="pulmorisk",
 )

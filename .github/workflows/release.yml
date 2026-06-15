@@ -93,7 +93,7 @@ jobs:
           magick src/app/assets/icons/app_icon.png -define icon:auto-resize=256,128,64,48,32,16 src/app/assets/icons/app_icon.ico
 
       - name: Build with PyInstaller
-        run: uv run pyinstaller --clean --noconfirm lung-windows.spec
+        run: uv run pyinstaller --clean --noconfirm pulmorisk-windows.spec
 
       - name: Zip output
         shell: pwsh
@@ -151,11 +151,11 @@ jobs:
         run: brew install create-dmg
 
       - name: Build with PyInstaller
-        run: uv run pyinstaller --clean --noconfirm lung-mac.spec
+        run: uv run pyinstaller --clean --noconfirm pulmorisk-mac.spec
 
       - name: Create DMG
         run: |
-          # lung-mac.spec produces dist/PulmoRisk.app (the BUNDLE target)
+          # pulmorisk-mac.spec produces dist/PulmoRisk.app (the BUNDLE target)
           create-dmg \
             --volname "PulmoRisk" \
             --window-size 400 200 \

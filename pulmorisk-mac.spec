@@ -50,7 +50,7 @@ pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name="lung",
+    name="pulmorisk",
     debug=False,
     strip=False,
     upx=False,
@@ -59,13 +59,13 @@ exe = EXE(
 )
 coll = COLLECT(
     exe, a.binaries, a.zipfiles, a.datas,
-    strip=False, upx=False, name="lung",
+    strip=False, upx=False, name="pulmorisk",
 )
 app = BUNDLE(
     coll,
-    name="Lung.app",
+    name="PulmoRisk.app",
     icon="src/app/assets/icons/app_icon.icns",
-    bundle_identifier="com.yourorg.lung",
+    bundle_identifier="com.yourorg.pulmorisk",
     info_plist={
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "11.0",

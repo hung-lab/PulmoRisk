@@ -33,7 +33,7 @@ fi
 BUILD_TYPE="${1:-both}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SPEC_FILE="$PROJECT_ROOT/lung.spec"
+SPEC_FILE="$PROJECT_ROOT/pulmorisk.spec"
 ICON_FILE="$PROJECT_ROOT/src/app/assets/icons/app_icon.png"
 
 cd "$PROJECT_ROOT"
@@ -73,7 +73,7 @@ clean_build() {
     find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
     # Remove spec file generated files
-    rm -f lung.spec.bak
+    rm -f pulmorisk.spec.bak
 
     print_status "Clean complete"
 }
@@ -164,7 +164,7 @@ EOF
 test_app() {
     print_status "Testing application..."
 
-    if [ ! -f "dist/PulmoRisk/lunPulmoRiskg" ]; then
+    if [ ! -f "dist/PulmoRisk/PulmoRisk" ]; then
         print_error "Application not found"
         return 1
     fi
@@ -208,8 +208,8 @@ create_appimage() {
 
     # Copy icon
     if [ -f "$ICON_FILE" ]; then
-        cp app_icon.png "$APP_DIR/usr/share/icons/hicolor/256x256/apps/PulmoRisk.png"
-        cp app_icon.png "$APP_DIR/PulmoRisk.png"
+        cp "$ICON_FILE" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/PulmoRisk.png"
+        cp "$ICON_FILE" "$APP_DIR/PulmoRisk.png"
     fi
 
     # Create desktop file
@@ -289,7 +289,7 @@ EOF
 
     # Copy icon
     if [ -f "$ICON_FILE" ]; then
-        cp app_icon.png "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/PulmoRisk.png"
+        cp "$ICON_FILE" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/PulmoRisk.png"
     fi
 
     # Create desktop file

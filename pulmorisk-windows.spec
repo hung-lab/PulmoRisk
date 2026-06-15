@@ -50,7 +50,7 @@ pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name="lung",
+    name="pulmorisk",
     debug=False,
     strip=False,
     upx=False,
@@ -59,5 +59,5 @@ exe = EXE(
 )
 coll = COLLECT(
     exe, a.binaries, a.zipfiles, a.datas,
-    strip=False, upx=False, name="lung",
+    strip=False, upx=False, name="pulmorisk",
 )
