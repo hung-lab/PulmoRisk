@@ -35,8 +35,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SPEC_FILE="$PROJECT_ROOT/pulmorisk.spec"
 ICON_FILE="$PROJECT_ROOT/src/app/assets/icons/app_icon.png"
+DIST_DIR="$PROJECT_ROOT/dist"
+APP_NAME="PulmoRisk"
+
+mkdir -p "$DIST_DIR"
 
 cd "$PROJECT_ROOT"
+
+
 
 # Check for required files
 check_requirements() {
@@ -242,7 +248,7 @@ EOF
     chmod +x "$APP_DIR/AppRun"
 
     # Build AppImage
-    ARCH=x86_64 ./appimagetool "$APP_DIR" PulmoRisk-x86_64.AppImage
+    ARCH=x86_64 ./appimagetool "$APP_DIR" "$DIST_DIR/${APP_NAME}-x86_64.AppImage"
 
     if [ $? -eq 0 ]; then
         APP_SIZE=$(du -sh PulmoRisk-x86_64.AppImage | cut -f1)
@@ -319,7 +325,7 @@ Description: Lung Cancer risk prediction tool
 EOF
 
     # Build package
-    dpkg-deb --build "$PKG_DIR"
+    dpkg-deb --build "$PKG_DIR" "$DIST_DIR/${APP_NAME}_1.1.0_amd64.deb"
 
     if [ $? -eq 0 ]; then
         PKG_SIZE=$(du -sh "${PKG_DIR}.deb" | cut -f1)
