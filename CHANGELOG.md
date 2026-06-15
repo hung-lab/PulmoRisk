@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.2.2...v1.3.0) (2026-06-15)
+
+
+### Features
+
+* implement integral radiomics ([3f5949a](https://github.com/hung-lab/Lung_cancer_risk_models/commit/3f5949a7d72fb446ce520f2cf9705d77784d32df))
+
 ## [1.2.2](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.2.1...v1.2.2) (2026-06-10)
 
 
