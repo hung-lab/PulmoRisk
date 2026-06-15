@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.0...v1.3.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* bug in spec files related to icon path as well as rename to name of app ([3922296](https://github.com/hung-lab/Lung_cancer_risk_models/commit/39222961b38a2166fd5293955b92a7f8480c7501))
+
 ## [1.3.0](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.2.2...v1.3.0) (2026-06-15)
 
 
