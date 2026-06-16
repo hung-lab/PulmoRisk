@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import threading
@@ -11,7 +12,7 @@ import pandas as pd
 
 from app.controllers.base_controller import BaseController
 from app.utils.event_bus import AppEvent
-from app.utils.helpers import format_percent
+from app.utils.helpers import find_rscript, format_percent
 
 if TYPE_CHECKING:
     from app.models.patient_model import IntegralRadiomicsInput
@@ -72,6 +73,7 @@ class IntegralController(BaseController):
 
             # R code to predict and output JSON
             r_code = f"""
+            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
             library(integralrad)
             library(jsonlite)
 
@@ -98,9 +100,15 @@ class IntegralController(BaseController):
                 },
             )
 
+            env = os.environ.copy()
+            env["R_LIBS_USER"] = str(Path.home() / ".pulmorisk" / "r" / "library")
+
+            rscript_path = find_rscript()
+
             # Run R subprocess
             result = subprocess.run(
-                ["Rscript", "-e", r_code],
+                [rscript_path, "-e", r_code],
+                env=env,
                 capture_output=True,
                 text=True,
                 check=True,

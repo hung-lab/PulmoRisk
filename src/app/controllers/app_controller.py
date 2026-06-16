@@ -94,39 +94,60 @@ class AppController(BaseController):
             # ───────────────────────────────
             # 3. Stable R library path
             # ───────────────────────────────
-            r_lib = Path.home() / "R" / "library"
+            r_lib = Path.home() / ".pulmorisk" / "r" / "library"
             r_lib.mkdir(parents=True, exist_ok=True)
 
             # ───────────────────────────────
             # 4. CLEAN R SCRIPT (NO INDENTATION, NO MIXED SYSTEMS)
             # ───────────────────────────────
-            r_script = f"""
-        options(repos = c(CRAN = "https://cloud.r-project.org"))
+            r_script = """
+            options(repos = c(CRAN = "https://cloud.r-project.org"))
 
-        Sys.setenv(R_LIBS_USER = "{r_lib}")
-        .libPaths(c("{r_lib}", .libPaths()))
+            lib <- Sys.getenv("R_LIBS_USER")
+            dir.create(lib, recursive = TRUE, showWarnings = FALSE)
 
-        if (!requireNamespace("remotes", quietly = TRUE)) {{
-            install.packages("remotes")
-        }}
+            # IMPORTANT: user lib first, then system
+            .libPaths(c(lib, .libPaths()))
 
-        remotes::install_github("mattwarkentin/INTEGRAL-Radiomics", upgrade = "never")
+            # install remotes only if missing
+            if (!requireNamespace("remotes", quietly = TRUE)) {
+                install.packages("remotes", lib = lib)
+            }
 
-        library(integralrad)
+            # check if integralrad already installed (prevents reinstall every launch)
+            if (!requireNamespace("integralrad", quietly = TRUE)) {
+                remotes::install_github(
+                    "mattwarkentin/INTEGRAL-Radiomics",
+                    upgrade = "never",
+                    lib = lib
+                )
+            }
 
-        integralrad::install_integralrad_cli()
-        """
+            # load package normally (uses .libPaths order)
+            library(integralrad)
 
-            script_path = Path("/tmp/install_integralrad.R")
+            # install CLI only if needed
+            if (exists("install_integralrad_cli")) {
+                integralrad::install_integralrad_cli()
+            }
+            """
+
+            script_path = Path.home() / ".pulmorisk" / "r" / "install_integralrad.R"
+            script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text(r_script)
 
             # ───────────────────────────────
             # 5. SAFE ENV
             # ───────────────────────────────
             env = os.environ.copy()
-            env["R_LIBS_USER"] = str(r_lib)
-            env["TMPDIR"] = "/tmp"
-            env["HOME"] = str(Path.home())
+            env.update(
+                {
+                    "R_LIBS_USER": str(r_lib),
+                    "R_LIBS": str(r_lib),
+                    "HOME": str(Path.home()),
+                    "TMPDIR": "/tmp",
+                }
+            )
 
             try:
                 subprocess.run(

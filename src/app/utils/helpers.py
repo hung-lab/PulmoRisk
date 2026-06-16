@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -110,15 +111,38 @@ def validate_ct_path(path: Path) -> tuple[bool, str]:
 
 
 def find_integral_cli() -> str | None:
-    # 1. system PATH
+    candidates: list[str | Path] = []
+
+    # 1. PATH lookup (best case)
     cli = shutil.which("integral-radiomics")
     if cli:
         return cli
 
-    # 2. common user-local install location
-    local_cli = Path.home() / ".local" / "bin" / "integral-radiomics"
-    if local_cli.exists():
-        return str(local_cli)
+    # 2. user local bin
+    candidates.append(Path.home() / ".local" / "bin" / "integral-radiomics")
+
+    # 3. app-managed install (recommended for your app)
+    candidates.append(Path.home() / ".pulmorisk" / "bin" / "integral-radiomics")
+
+    # 4. R-style user bin locations
+    candidates.append(Path.home() / "R" / "bin" / "integral-radiomics")
+
+    # 5. scan R library bin folders (common R install pattern)
+    r_libs = [
+        Path.home() / "R",
+        Path.home() / ".local" / "lib",
+    ]
+
+    for base in r_libs:
+        if base.exists():
+            for p in base.rglob("integral-radiomics"):
+                if p.is_file() and os.access(p, os.X_OK):
+                    return str(p)
+
+    # 6. direct candidate check
+    for c in candidates:
+        if c.exists() and os.access(c, os.X_OK):
+            return str(c)
 
     return None
 
