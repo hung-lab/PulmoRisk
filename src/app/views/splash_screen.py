@@ -33,8 +33,8 @@ class SplashScreen:
       - ``model_error``→ shows an error message with a Quit button
     """
 
-    _WIDTH = 480
-    _HEIGHT = 280
+    _WIDTH = 600
+    _HEIGHT = 400
 
     def __init__(self, root: ctk.CTk, bus: EventBus) -> None:
         self._root = root

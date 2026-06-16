@@ -55,16 +55,39 @@ class AppController(BaseController):
     def quit_app(self):
         self.bus.emit(AppEvent(type="app", message="quit"))
 
+    # ─────────────────────────────── R SETUP ──────────────────────────────
+
+    @staticmethod
+    def _ubuntu_codename() -> str:
+        """Return the Ubuntu release codename (e.g. 'jammy', 'focal').
+
+        Used to pick the correct Posit Package Manager binary URL.
+        Falls back to 'jammy' (22.04 LTS) if the release cannot be detected.
+        """
+        try:
+            lines = Path("/etc/os-release").read_text().splitlines()
+            for line in lines:
+                if line.startswith("UBUNTU_CODENAME="):
+                    return line.split("=", 1)[1].strip().strip('"')
+                if line.startswith("VERSION_CODENAME="):
+                    return line.split("=", 1)[1].strip().strip('"')
+        except OSError:
+            pass
+        return "jammy"
+
     def check_and_install_integral(self):
-        """Check/install integralrad safely on app launch."""
+        """Check / install integralrad safely on app launch.
+
+        Uses Posit Package Manager (PPM) to fetch pre-compiled Linux binaries
+        so that packages like openssl, curl, fs and yaml12 do NOT need to be
+        compiled from source — avoiding the libssl-dev / libuv / rustc deps.
+        """
         CH = {"channel": "integral"}
 
         try:
             self._log("Checking R dependencies", data=CH)
 
-            # ───────────────────────────────
-            # 1. Check R exists
-            # ───────────────────────────────
+            # ── 1. Rscript ────────────────────────────────────────────────
             rscript_path = find_rscript()
             if not rscript_path:
                 self._log(
@@ -75,10 +98,9 @@ class AppController(BaseController):
                 self._emit(AppEvent(type="ui_state", message="R_missing"))
                 return
 
-            self._log(f"Using Rscript at: {rscript_path}", level="INFO", data=CH)
-            # ───────────────────────────────
-            # 2. PATH for CLI
-            # ───────────────────────────────
+            self._log(f"Using Rscript at: {rscript_path}", data=CH)
+
+            # ── 2. PATH for CLI ───────────────────────────────────────────
             user_bin = Path.home() / ".local" / "bin"
             os.environ["PATH"] = f"{user_bin}:{os.environ.get('PATH', '')}"
 
@@ -91,54 +113,77 @@ class AppController(BaseController):
 
             self._log("Installing integralrad (first run setup)…", data=CH)
 
-            # ───────────────────────────────
-            # 3. Stable R library path
-            # ───────────────────────────────
+            # ── 3. Writable R library ─────────────────────────────────────
             r_lib = Path.home() / ".pulmorisk" / "r" / "library"
             r_lib.mkdir(parents=True, exist_ok=True)
 
-            # ───────────────────────────────
-            # 4. CLEAN R SCRIPT (NO INDENTATION, NO MIXED SYSTEMS)
-            # ───────────────────────────────
-            r_script = """
-            options(repos = c(CRAN = "https://cloud.r-project.org"))
+            # ── 4. Detect Ubuntu codename for PPM binary URL ──────────────
+            codename = self._ubuntu_codename()
+            ppm_url = (
+                f"https://packagemanager.posit.co/cran/__linux__/{codename}/latest"
+            )
+            self._log(
+                f"Using PPM binary repo for Ubuntu {codename}: {ppm_url}", data=CH
+            )
 
-            lib <- Sys.getenv("R_LIBS_USER")
-            dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+            # ── 5. R install script ───────────────────────────────────────
+            #
+            # Key points:
+            #   • PPM is set as the PRIMARY repo so R downloads pre-built
+            #     .deb-style binaries instead of compiling from source.
+            #     This avoids needing libssl-dev, libcurl4-openssl-dev,
+            #     libuv1-dev, rustc, etc.
+            #   • CRAN is kept as a fallback for packages PPM doesn't have.
+            #   • pak is used for dependency resolution; it respects the
+            #     binary-first repos option automatically.
+            #   • integralrad is installed only if not already present.
+            #   • install_integralrad_cli() installs the CLI binary to
+            #     ~/.local/bin for later subprocess use.
+            #
+            r_script = f"""
+lib <- "{r_lib}"
+dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+.libPaths(c(lib, .libPaths()))
 
-            # IMPORTANT: user lib first, then system
-            .libPaths(c(lib, .libPaths()))
+# ── Use Posit Package Manager for pre-compiled Linux binaries ──────────────
+# This prevents source compilation of openssl, curl, fs, yaml12, etc.
+options(
+  repos = c(
+    PPM  = "{ppm_url}",
+    CRAN = "https://cloud.r-project.org"
+  )
+)
 
-            # install remotes only if missing
-            if (!requireNamespace("remotes", quietly = TRUE)) {
-                install.packages("remotes", lib = lib)
-            }
+# ── Install pak if missing (pak itself comes as a binary from PPM) ─────────
+if (!requireNamespace("pak", quietly = TRUE)) {{
+    install.packages("pak", lib = lib)
+}}
 
-            # check if integralrad already installed (prevents reinstall every launch)
-            if (!requireNamespace("integralrad", quietly = TRUE)) {
-                remotes::install_github(
-                    "mattwarkentin/INTEGRAL-Radiomics",
-                    upgrade = "never",
-                    lib = lib
-                )
-            }
+# ── Install integralrad and all its dependencies via pak ──────────────────
+# pak resolves the full dependency tree and downloads binaries in parallel.
+if (!requireNamespace("integralrad", quietly = TRUE)) {{
+    pak::pak(
+        "mattwarkentin/INTEGRAL-Radiomics",
+        lib = lib,
+        upgrade = FALSE
+    )
+}}
 
-            # load package normally (uses .libPaths order)
-            library(integralrad)
+# ── Verify and install CLI ─────────────────────────────────────────────────
+library(integralrad)
 
-            # install CLI only if needed
-            if (exists("install_integralrad_cli")) {
-                integralrad::install_integralrad_cli()
-            }
-            """
+if (is.function(integralrad::install_integralrad_cli)) {{
+    integralrad::install_integralrad_cli()
+}}
+
+cat("integralrad OK\\n")
+"""
 
             script_path = Path.home() / ".pulmorisk" / "r" / "install_integralrad.R"
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text(r_script)
 
-            # ───────────────────────────────
-            # 5. SAFE ENV
-            # ───────────────────────────────
+            # ── 6. Run R ──────────────────────────────────────────────────
             env = os.environ.copy()
             env.update(
                 {
@@ -146,35 +191,45 @@ class AppController(BaseController):
                     "R_LIBS": str(r_lib),
                     "HOME": str(Path.home()),
                     "TMPDIR": "/tmp",
+                    # Prevent R from opening a browser for package vignettes
+                    "R_BROWSER": "false",
                 }
             )
 
             try:
-                subprocess.run(
+                result = subprocess.run(
                     [rscript_path, "--vanilla", str(script_path)],
                     env=env,
                     capture_output=True,
                     text=True,
                     check=True,
                 )
+                # Surface R's stderr to the log so progress is visible
+                if result.stderr:
+                    for line in result.stderr.strip().splitlines():
+                        self._log(line, data=CH)
 
             except subprocess.CalledProcessError as e:
-                self._log(f"Install failed:\n{e.stderr}", level="ERROR", data=CH)
+                # Log both streams so the user can see exactly what failed
+                if e.stderr:
+                    for line in e.stderr.strip().splitlines():
+                        self._log(line, level="ERROR", data=CH)
                 self._emit(AppEvent(type="ui_state", message="install_failed"))
                 return
 
-            # ───────────────────────────────
-            # 6. VERIFY
-            # ───────────────────────────────
+            # ── 7. Verify CLI exists ──────────────────────────────────────
             if find_integral_cli():
                 self._log("integralrad installed successfully", data=CH)
                 self._emit(AppEvent(type="ui_state", message="install_complete"))
             else:
-                self._log("Install finished but CLI not found", level="ERROR", data=CH)
+                self._log(
+                    "Install finished but integral-radiomics CLI not found in PATH",
+                    level="ERROR",
+                    data=CH,
+                )
                 self._emit(AppEvent(type="ui_state", message="install_failed"))
 
         except Exception as exc:
-            # Safety net so the splash screen never waits forever if
-            # something unexpected blows up here.
+            # Safety net — if anything unexpected throws, unblock the splash.
             self._log(f"Unexpected error during R setup: {exc}", level="ERROR", data=CH)
             self._emit(AppEvent(type="ui_state", message="install_failed"))

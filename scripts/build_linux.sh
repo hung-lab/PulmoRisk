@@ -179,7 +179,7 @@ Type=Application
 Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool
 Exec=$APP_EXEC
-Icon=$APP_NAME
+Icon=$APP_ID
 Terminal=false
 Categories=Science;Education;MedicalSoftware;
 EOF
@@ -245,8 +245,8 @@ create_appimage() {
 
     # Copy icon
     if [ -f "$ICON_FILE" ]; then
-        cp "$ICON_FILE" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
-        cp "$ICON_FILE" "$APP_DIR/$APP_NAME.png"
+        cp "$ICON_FILE" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/$APP_ID.png"
+        cp "$ICON_FILE" "$APP_DIR/$APP_ID.png"
     fi
 
     # Create desktop file
@@ -257,7 +257,7 @@ Type=Application
 Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool
 Exec=$APP_EXEC
-Icon=$APP_NAME
+Icon=$APP_ID
 Terminal=false
 Categories=Science;Education;MedicalSoftware;
 EOF
@@ -329,7 +329,7 @@ EOF
 
     # Copy icon
     if [ -f "$ICON_FILE" ]; then
-        cp "$ICON_FILE" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
+        cp "$ICON_FILE" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/$APP_ID.png"
     fi
 
     # Create desktop file

@@ -110,39 +110,122 @@ def validate_ct_path(path: Path) -> tuple[bool, str]:
     return True, ""
 
 
+def find_rscript() -> str | None:
+    """Locate the Rscript executable.
+
+    Search order:
+      1. PATH via shutil.which — covers any user-managed install (conda,
+         rig, nix, manually built R, etc.) and is the fastest check.
+      2. Standard system locations not always on PATH, in order of how
+         common the install method is on each platform.
+
+    Returns the first path that exists and successfully runs
+    ``Rscript --version``, or None if R is not found.
+    """
+    # 1. Honour PATH first — shutil.which already verifies existence
+    #    and executability, so no extra checks needed for this case.
+    path_result = shutil.which("Rscript")
+    if path_result:
+        return path_result
+
+    # 2. Platform-specific fallback locations
+    #    (only reached when Rscript is NOT on PATH)
+    candidates: list[Path] = []
+
+    if sys.platform == "darwin":
+        candidates = [
+            # Apple Silicon Homebrew
+            Path("/opt/homebrew/bin/Rscript"),
+            # Intel Homebrew
+            Path("/usr/local/bin/Rscript"),
+            # CRAN .pkg installer — default location
+            Path("/Library/Frameworks/R.framework/Resources/bin/Rscript"),
+            # rig-managed installs (rig puts the active version here)
+            Path(
+                "/Library/Frameworks/R.framework/Versions/Current/Resources/bin/Rscript"
+            ),
+        ]
+    elif sys.platform.startswith("linux"):
+        candidates = [
+            # apt install r-base (Ubuntu/Debian) — most common
+            Path("/usr/bin/Rscript"),
+            # Some distros install under /usr/local
+            Path("/usr/local/bin/Rscript"),
+            # rig on Linux
+            Path(Path.home() / ".local/share/rig/R/current/bin/Rscript"),
+        ]
+    elif sys.platform == "win32":
+        # On Windows, R is typically installed under Program Files.
+        # Walk R-x.y.z sub-directories newest-first so we pick the latest.
+        r_root = Path("C:/Program Files/R")
+        if r_root.exists():
+            for version_dir in sorted(r_root.iterdir(), reverse=True):
+                rscript = version_dir / "bin" / "Rscript.exe"
+                if rscript.exists():
+                    candidates.append(rscript)
+                    break  # take only the newest
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            result = subprocess.run(
+                [str(candidate), "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return str(candidate)
+        except Exception:
+            continue
+
+    return None
+
+
 def find_integral_cli() -> str | None:
-    candidates: list[str | Path] = []
+    """Locate the integral-radiomics CLI binary.
 
-    # 1. PATH lookup (best case)
-    cli = shutil.which("integral-radiomics")
-    if cli:
-        return cli
+    Checks known install locations in order of likelihood, without any
+    recursive filesystem scan, to keep startup time fast.
 
-    # 2. user local bin
-    candidates.append(Path.home() / ".local" / "bin" / "integral-radiomics")
+    The Rapp package (which integralrad uses to install the CLI) places
+    the binary in platform-specific locations documented below.
 
-    # 3. app-managed install (recommended for your app)
-    candidates.append(Path.home() / ".pulmorisk" / "bin" / "integral-radiomics")
+    Returns the path string if found and executable, else None.
+    """
+    cli_name = "integral-radiomics"
+    if sys.platform == "win32":
+        cli_name = "integral-radiomics.exe"
 
-    # 4. R-style user bin locations
-    candidates.append(Path.home() / "R" / "bin" / "integral-radiomics")
+    # 1. PATH — covers any install the user has already configured.
+    path_result = shutil.which(cli_name)
+    if path_result:
+        return path_result
 
-    # 5. scan R library bin folders (common R install pattern)
-    r_libs = [
-        Path.home() / "R",
-        Path.home() / ".local" / "lib",
+    # 2. Known install locations for integralrad::install_integralrad_cli()
+    #    (via the Rapp package), checked in order of likelihood.
+    candidates: list[Path] = [
+        # Linux / macOS — Rapp default user bin
+        Path.home() / ".local" / "bin" / cli_name,
+        # App-managed install location (used by check_and_install_integral)
+        Path.home() / ".pulmorisk" / "bin" / cli_name,
+        # macOS — Rapp installs here when ~/.local/bin is not used
+        Path.home()
+        / "Library"
+        / "Application Support"
+        / "org.R-project.R"
+        / "R"
+        / "Rapp"
+        / "bin"
+        / cli_name,
+        # Rapp can also install into the R user data dir on Linux
+        Path.home() / ".local" / "share" / "R" / "Rapp" / "bin" / cli_name,
     ]
 
-    for base in r_libs:
-        if base.exists():
-            for p in base.rglob("integral-radiomics"):
-                if p.is_file() and os.access(p, os.X_OK):
-                    return str(p)
-
-    # 6. direct candidate check
-    for c in candidates:
-        if c.exists() and os.access(c, os.X_OK):
-            return str(c)
+    for candidate in candidates:
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
 
     return None
 
@@ -150,28 +233,3 @@ def find_integral_cli() -> str | None:
 def format_percent(value: float, decimals: int = 3) -> str:
     percent = f"{value * 100:.{decimals}f}"
     return f"{percent.rstrip('0').rstrip('.')}%"
-
-
-def find_rscript():
-    candidates = [
-        shutil.which("Rscript"),
-        "/opt/homebrew/bin/Rscript",  # Apple Silicon Homebrew
-        "/usr/local/bin/Rscript",  # Intel Homebrew
-        "/Library/Frameworks/R.framework/Resources/bin/Rscript",  # CRAN macOS install
-    ]
-
-    for candidate in candidates:
-        if candidate and Path(candidate).exists():
-            try:
-                result = subprocess.run(
-                    [candidate, "--version"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if result.returncode == 0:
-                    return candidate
-            except Exception:
-                pass
-
-    return None
