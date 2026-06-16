@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.3...v1.3.4) (2026-06-16)
+
+
+### Bug Fixes
+
+* bug with file path name causing mismatch ([5dbf2bb](https://github.com/hung-lab/Lung_cancer_risk_models/commit/5dbf2bb7f9151cdadedd9a0e68fcd229386b7e86))
+
 ## [1.3.3](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.2...v1.3.3) (2026-06-15)
 
 
