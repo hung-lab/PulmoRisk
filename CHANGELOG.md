@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.9](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.8...v1.3.9) (2026-06-16)
+
+
+### Bug Fixes
+
+* issue with R package binaries ([ab5e8af](https://github.com/hung-lab/Lung_cancer_risk_models/commit/ab5e8afb1397b6a5ecf5cd6aa840989bd8504c35))
+
 ## [1.3.8](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.7...v1.3.8) (2026-06-16)
 
 
