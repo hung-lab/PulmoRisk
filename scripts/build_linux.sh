@@ -1,6 +1,10 @@
 #!/bin/bash
 # Build script for Lung Cancer Linux application
-# Usage: ./build_linux.sh [clean|build|both|appimage]
+# Usage: ./build_linux.sh [clean|build|both|test|appimage|deb|troubleshoot]
+#
+# Optional: override the version embedded in package names by setting
+# VERSION in the environment, e.g.:
+#   VERSION="${GITHUB_REF_NAME#v}" ./build_linux.sh both
 
 set -e  # Exit on error
 
@@ -36,7 +40,24 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SPEC_FILE="$PROJECT_ROOT/pulmorisk.spec"
 ICON_FILE="$PROJECT_ROOT/src/app/assets/icons/app_icon.png"
 DIST_DIR="$PROJECT_ROOT/dist"
+
 APP_NAME="PulmoRisk"
+APP_ID="pulmorisk"
+VERSION="${VERSION:-1.3.4}"
+ARCH="x86_64"     # used for the AppImage filename
+DEB_ARCH="amd64"  # Debian's arch naming convention
+
+APP_EXEC="${APP_ID}"
+APP_PATH="$DIST_DIR/$APP_NAME"
+
+APPIMAGE_NAME="${APP_NAME}-${ARCH}.AppImage"
+APPIMAGE_PATH="$DIST_DIR/$APPIMAGE_NAME"
+
+DEB_NAME="${APP_ID}_${VERSION}_${DEB_ARCH}.deb"
+DEB_PATH="$DIST_DIR/$DEB_NAME"
+
+APP_DIR="${APP_NAME}.AppDir"
+APP_BINARY="$APP_PATH/$APP_EXEC"
 
 mkdir -p "$DIST_DIR"
 
@@ -86,7 +107,7 @@ clean_build() {
 
 
 
-# Create icon if it doesn't exist
+# Create additional icon sizes alongside the source icon (optional, best-effort)
 create_icon() {
     print_status "Icon File: $ICON_FILE"
     if [ ! -f "$ICON_FILE" ]; then
@@ -94,19 +115,18 @@ create_icon() {
         return
     fi
 
-    # For Linux, PNG is usually sufficient
-    # But we can create different sizes for better appearance
     if command -v convert &> /dev/null; then
-        print_status "Creating icon sizes from app_icon.png..."
+        print_status "Creating icon sizes from $ICON_FILE..."
 
-        mkdir -p icons
+        ICON_OUT_DIR="$PROJECT_ROOT/icons"
+        mkdir -p "$ICON_OUT_DIR"
         for size in 16 32 48 64 128 256; do
-            convert app_icon.png -resize ${size}x${size} icons/logo_${size}.png 2>/dev/null || true
+            convert "$ICON_FILE" -resize ${size}x${size} "$ICON_OUT_DIR/logo_${size}.png" 2>/dev/null || true
         done
 
-        print_status "Icons created in icons/ directory"
+        print_status "Icons created in $ICON_OUT_DIR/"
     else
-        print_warning "ImageMagick not installed. Using app_icon.png as-is."
+        print_warning "ImageMagick not installed. Using $ICON_FILE as-is."
         print_warning "Install for better icons: sudo apt-get install imagemagick"
     fi
 }
@@ -128,13 +148,17 @@ build_app() {
     if [ $? -eq 0 ]; then
         print_status "Build completed successfully!"
 
-        if [ -d "dist/PulmoRisk" ]; then
-            APP_SIZE=$(du -sh dist/PulmoRisk | cut -f1)
+        if [ -d "$APP_PATH" ]; then
+            APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
             print_status "Application size: $APP_SIZE"
-            print_status "Application location: $PROJECT_ROOT/dist/PulmoRisk"
+            print_status "Application location: $APP_PATH"
 
             # Make executable
-            chmod +x dist/PulmoRisk/PulmoRisk
+            if [ -f "$APP_PATH/$APP_EXEC" ]; then
+                chmod +x "$APP_PATH/$APP_EXEC"
+            else
+                print_warning "Executable not found: $APP_PATH/$APP_EXEC"
+            fi
         fi
     else
         print_error "Build failed. Check build.log for details"
@@ -146,47 +170,55 @@ build_app() {
 create_desktop_file() {
     print_status "Creating .desktop file..."
 
-    # Ensure the directory exists
-    mkdir -p dist/PulmoRisk
+    mkdir -p "$APP_PATH"
 
-    cat > dist/PulmoRisk/PulmoRisk.desktop << EOF
+    cat > "$APP_PATH/$APP_NAME.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=PulmoRisk
+Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool
-Exec=$(pwd)/dist/PulmoRisk/PulmoRisk
-Icon=$(pwd)/dist/PulmoRisk/app_icon.png
+Exec=$APP_EXEC
+Icon=$APP_NAME
 Terminal=false
 Categories=Science;Education;MedicalSoftware;
 EOF
 
-    print_status "Desktop file created: dist/PulmoRisk/PulmoRisk.desktop"
+    print_status "Desktop file created: $APP_PATH/$APP_NAME.desktop"
     print_status "To install system-wide:"
-    print_status "  sudo cp dist/PulmoRisk/PulmoRisk.desktop /usr/share/applications/"
+    print_status "  sudo cp $APP_PATH/$APP_NAME.desktop /usr/share/applications/"
 }
 
 # Test the built application
 test_app() {
     print_status "Testing application..."
 
-    if [ ! -f "dist/PulmoRisk/PulmoRisk" ]; then
-        print_error "Application not found"
+    if [ ! -f "$APP_BINARY" ]; then
+        print_error "Application not found: $APP_BINARY"
         return 1
     fi
 
-    # Try to launch the app
     print_status "Attempting to launch application..."
-    ./dist/PulmoRisk/PulmoRisk &
 
-    print_status "Application launched. Check if it opens correctly."
-    print_warning "Press Ctrl+C to stop if app doesn't open or crashes"
+    "$APP_BINARY" &
+    APP_PID=$!
+
+    print_status "Application launched (PID: $APP_PID)"
+    print_warning "Press Ctrl+C to stop if it doesn't open or crashes"
+
     sleep 5
+
+    # Optional: check if still running
+    if kill -0 "$APP_PID" 2>/dev/null; then
+        print_status "App is still running"
+    else
+        print_warning "App exited early — likely crash"
+    fi
 }
 
 # Create AppImage (portable Linux application)
 create_appimage() {
-    if [ ! -d "dist/PulmoRisk" ]; then
+    if [ ! -d "$APP_PATH" ]; then
         print_error "Application not found. Build first."
         return 1
     fi
@@ -203,56 +235,58 @@ create_appimage() {
     fi
 
     # Create AppDir structure
-    APP_DIR="PulmoRisk.AppDir"
     rm -rf "$APP_DIR"
     mkdir -p "$APP_DIR/usr/bin"
     mkdir -p "$APP_DIR/usr/share/applications"
     mkdir -p "$APP_DIR/usr/share/icons/hicolor/256x256/apps"
 
     # Copy application
-    cp -r dist/PulmoRisk/* "$APP_DIR/usr/bin/"
+    cp -r "$APP_PATH/"* "$APP_DIR/usr/bin/"
 
     # Copy icon
     if [ -f "$ICON_FILE" ]; then
-        cp "$ICON_FILE" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/PulmoRisk.png"
-        cp "$ICON_FILE" "$APP_DIR/PulmoRisk.png"
+        cp "$ICON_FILE" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
+        cp "$ICON_FILE" "$APP_DIR/$APP_NAME.png"
     fi
 
     # Create desktop file
-    cat > "$APP_DIR/PulmoRisk.desktop" << EOF
+    cat > "$APP_DIR/$APP_NAME.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=PulmoRisk
+Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool
-Exec=PulmoRisk
-Icon=PulmoRisk
+Exec=$APP_EXEC
+Icon=$APP_NAME
 Terminal=false
 Categories=Science;Education;MedicalSoftware;
 EOF
 
     # Copy desktop file
-    cp "$APP_DIR/PulmoRisk.desktop" "$APP_DIR/usr/share/applications/"
+    cp "$APP_DIR/$APP_NAME.desktop" "$APP_DIR/usr/share/applications/"
 
     # Create AppRun
-    cat > "$APP_DIR/AppRun" << 'EOF'
+    # NOTE: this heredoc is intentionally UNQUOTED so that ${APP_EXEC} is
+    # substituted at build time. $SELF, $HERE and $@ are escaped so they're
+    # only evaluated at runtime inside the AppImage.
+    cat > "$APP_DIR/AppRun" << EOF
 #!/bin/bash
-SELF=$(readlink -f "$0")
-HERE=${SELF%/*}
-export PATH="${HERE}/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
-cd "${HERE}/usr/bin"
-exec "${HERE}/usr/bin/PulmoRisk" "$@"
+SELF=\$(readlink -f "\$0")
+HERE=\${SELF%/*}
+export PATH="\${HERE}/usr/bin:\${PATH}"
+export LD_LIBRARY_PATH="\${HERE}/usr/lib:\${LD_LIBRARY_PATH}"
+cd "\${HERE}/usr/bin"
+exec "\${HERE}/usr/bin/${APP_EXEC}" "\$@"
 EOF
 
     chmod +x "$APP_DIR/AppRun"
 
     # Build AppImage
-    ARCH=x86_64 ./appimagetool "$APP_DIR" "$DIST_DIR/${APP_NAME}-x86_64.AppImage"
+    ARCH=$ARCH ./appimagetool "$APP_DIR" "$APPIMAGE_PATH"
 
-    if [ $? -eq 0 ]; then
-        APP_SIZE=$(du -sh PulmoRisk-x86_64.AppImage | cut -f1)
-        print_status "AppImage created: PulmoRisk-x86_64.AppImage ($APP_SIZE)"
+    if [ -f "$APPIMAGE_PATH" ]; then
+        APP_SIZE=$(du -sh "$APPIMAGE_PATH" | cut -f1)
+        print_status "AppImage created: $APPIMAGE_PATH ($APP_SIZE)"
         print_status "You can now distribute this single file!"
     else
         print_error "Failed to create AppImage"
@@ -265,7 +299,7 @@ EOF
 
 # Create DEB package
 create_deb() {
-    if [ ! -d "dist/PulmoRisk" ]; then
+    if [ ! -d "$APP_PATH" ]; then
         print_error "Application not found. Build first."
         return 1
     fi
@@ -273,51 +307,51 @@ create_deb() {
     print_status "Creating DEB package..."
 
     # Create package structure
-    PKG_DIR="PulmoRisk_1.1.0_amd64"
+    PKG_DIR="${APP_NAME}_${VERSION}_${DEB_ARCH}"
     rm -rf "$PKG_DIR"
 
     mkdir -p "$PKG_DIR/DEBIAN"
-    mkdir -p "$PKG_DIR/opt/PulmoRisk"
+    mkdir -p "$PKG_DIR/opt/$APP_NAME"
     mkdir -p "$PKG_DIR/usr/share/applications"
     mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
     mkdir -p "$PKG_DIR/usr/bin"
 
     # Copy application
-    cp -r dist/PulmoRisk/* "$PKG_DIR/opt/PulmoRisk/"
+    cp -r "$APP_PATH/"* "$PKG_DIR/opt/$APP_NAME/"
 
-# Create symlink for gui
-cat > "$PKG_DIR/usr/bin/PulmoRisk" << 'EOF'
+    # Create symlink for gui
+    cat > "$PKG_DIR/usr/bin/$APP_ID" << EOF
 #!/bin/bash
-cd /opt/PulmoRisk
-exec /opt/PulmoRisk/PulmoRisk "$@"
+cd /opt/$APP_NAME
+exec /opt/$APP_NAME/$APP_EXEC "\$@"
 EOF
-    chmod +x "$PKG_DIR/usr/bin/PulmoRisk"
+    chmod +x "$PKG_DIR/usr/bin/$APP_ID"
 
     # Copy icon
     if [ -f "$ICON_FILE" ]; then
-        cp "$ICON_FILE" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/PulmoRisk.png"
+        cp "$ICON_FILE" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/$APP_NAME.png"
     fi
 
     # Create desktop file
-    cat > "$PKG_DIR/usr/share/applications/PulmoRisk.desktop" << EOF
+    cat > "$PKG_DIR/usr/share/applications/$APP_NAME.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=PulmoRisk
+Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool
-Exec=/usr/bin/PulmoRisk
-Icon=PulmoRisk
+Exec=/usr/bin/$APP_ID
+Icon=$APP_NAME
 Terminal=false
 Categories=Science;Education;MedicalSoftware;
 EOF
 
     # Create control file
     cat > "$PKG_DIR/DEBIAN/control" << EOF
-Package: PulmoRisk
-Version: 1.0.0
+Package: $APP_ID
+Version: $VERSION
 Section: science
 Priority: optional
-Architecture: amd64
+Architecture: $DEB_ARCH
 Depends: python3 (>= 3.8)
 Maintainer: Your Name <your.email@example.com>
 Description: Lung Cancer risk prediction tool
@@ -325,12 +359,11 @@ Description: Lung Cancer risk prediction tool
 EOF
 
     # Build package
-    dpkg-deb --build "$PKG_DIR" "$DIST_DIR/${APP_NAME}_1.1.0_amd64.deb"
+    dpkg-deb --build "$PKG_DIR" "$DEB_PATH"
 
-    if [ $? -eq 0 ]; then
-        PKG_SIZE=$(du -sh "${PKG_DIR}.deb" | cut -f1)
-        print_status "DEB package created: ${PKG_DIR}.deb ($PKG_SIZE)"
-        print_status "Install with: sudo dpkg -i ${PKG_DIR}.deb"
+    if [ -f "$DEB_PATH" ]; then
+        PKG_SIZE=$(du -sh "$DEB_PATH" | cut -f1)
+        print_status "DEB package created: $DEB_PATH ($PKG_SIZE)"
     else
         print_error "Failed to create DEB package"
         return 1

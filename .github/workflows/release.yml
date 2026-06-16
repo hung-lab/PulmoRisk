@@ -55,7 +55,7 @@ jobs:
 
       - name: Run Linux build script
         run: |
-          ./scripts/build_linux.sh both
+          VERSION="${VERSION#v}" ./scripts/build_linux.sh both
 
       - name: Upload to release
         env:
@@ -63,7 +63,7 @@ jobs:
         run: |
           gh release upload ${{ needs.release.outputs.tag_name }} \
             dist/PulmoRisk-x86_64.AppImage \
-            dist/PulmoRisk_1.1.0_amd64.deb
+            dist/pulmorisk_*_amd64.deb
 
   build-windows:
     needs: release
