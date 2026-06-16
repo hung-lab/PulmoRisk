@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.7](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.6...v1.3.7) (2026-06-16)
+
+
+### Bug Fixes
+
+* issue with not finding Rscript on users machine and update some text and spacing ([c84693b](https://github.com/hung-lab/Lung_cancer_risk_models/commit/c84693b4a285bb93987b6652e18373e2c953dddd))
+
 ## [1.3.6](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.5...v1.3.6) (2026-06-16)
 
 
