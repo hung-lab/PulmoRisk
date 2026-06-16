@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.6](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.5...v1.3.6) (2026-06-16)
+
+
+### Bug Fixes
+
+* forgot to add version in create DMG step ([f0bd315](https://github.com/hung-lab/Lung_cancer_risk_models/commit/f0bd315aa100e36ad2a6d4007f024f2091831f9f))
+
 ## [1.3.5](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.4...v1.3.5) (2026-06-16)
 
 
