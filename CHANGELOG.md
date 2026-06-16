@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.8](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.7...v1.3.8) (2026-06-16)
+
+
+### Bug Fixes
+
+* path issue related to R and radiomics package ([b631914](https://github.com/hung-lab/Lung_cancer_risk_models/commit/b6319146f5aa78c589e155113915b8b8cbe3a2b1))
+
 ## [1.3.7](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.6...v1.3.7) (2026-06-16)
 
 
