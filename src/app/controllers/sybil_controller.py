@@ -7,6 +7,7 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
+import certifi
 import pandas as pd
 
 from app.controllers.base_controller import BaseController
@@ -15,6 +16,9 @@ from app.utils.event_bus import AppEvent, EventBus
 from app.utils.helpers import validate_ct_path
 from app.utils.sybil_epi import calculate_sybil_epi_score, epi_input_from_patient_data
 from app.utils.sybil_inference import run_sybil_pipeline
+
+os.environ["SSL_CERT_FILE"] = certifi.where()
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
 
 class SybilController(BaseController):

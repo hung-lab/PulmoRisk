@@ -1,5 +1,6 @@
 # lung-mac.spec
 import os
+import certifi
 from PyInstaller.utils.hooks import collect_all
 
 ctk_datas,   ctk_binaries,   ctk_hidden   = collect_all("customtkinter")
@@ -13,6 +14,10 @@ if os.path.exists("src/app/assets"):
     datas += [("src/app/assets", "assets")]
 if os.path.exists("src/app/assets/icons/app_icon.icns"):
     datas += [("src/app/assets/icons", "assets/icons")]
+
+datas += [
+    (certifi.where(), "certifi"),
+]
 
 binaries = ctk_binaries + sybil_binaries + torch_binaries + tv_binaries + pil_binaries
 

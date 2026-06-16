@@ -54,6 +54,8 @@ jobs:
             wget
 
       - name: Run Linux build script
+        env:
+          VERSION: ${{ needs.release.outputs.tag_name }}
         run: |
           VERSION="${VERSION#v}" ./scripts/build_linux.sh both
 
@@ -61,9 +63,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          VERSION="${{ needs.release.outputs.tag_name }}"
+          VERSION="${VERSION#v}"
+
           gh release upload ${{ needs.release.outputs.tag_name }} \
-            dist/PulmoRisk-x86_64.AppImage \
-            dist/pulmorisk_*_amd64.deb
+            dist/PulmoRisk-${VERSION}-x86_64.AppImage \
+            dist/pulmorisk_${VERSION}_amd64.deb
 
   build-windows:
     needs: release
@@ -97,14 +102,19 @@ jobs:
 
       - name: Zip output
         shell: pwsh
+        env:
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
-          Compress-Archive -Path dist/pulmorisk -DestinationPath dist/pulmorisk-windows-x86_64.zip
+          $VERSION = $env:TAG_NAME -replace '^v',''
+          Compress-Archive -Path dist/pulmorisk -DestinationPath dist/pulmorisk-windows-x86_64-$VERSION.zip
 
       - name: Upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
-          gh release upload ${{ needs.release.outputs.tag_name }} dist/pulmorisk-windows-x86_64.zip
+          $VERSION = $env:TAG_NAME -replace '^v',''
+          gh release upload ${{ needs.release.outputs.tag_name }} dist/pulmorisk-windows-x86_64-$VERSION.zip
 
   build-mac:
     needs: release
@@ -154,7 +164,11 @@ jobs:
         run: uv run pyinstaller --clean --noconfirm pulmorisk-mac.spec
 
       - name: Create DMG
+        env:
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
+          VERSION="${TAG_NAME#v}"
+
           # pulmorisk-mac.spec produces dist/PulmoRisk.app (the BUNDLE target)
           create-dmg \
             --volname "PulmoRisk" \
@@ -164,13 +178,15 @@ jobs:
             dist/PulmoRisk-mac-${{ matrix.arch }}.dmg \
             dist/PulmoRisk.app
 
-          if [ ! -f "dist/PulmoRisk-mac-${{ matrix.arch }}.dmg" ]; then
-            cp -r dist/PulmoRisk.app dist/PulmoRisk-mac-${{ matrix.arch }}.dmg
+          if [ ! -f "dist/PulmoRisk-mac-${VERSION}-${{ matrix.arch }}.dmg" ]; then
+            cp -r dist/PulmoRisk.app dist/PulmoRisk-mac-${VERSION}-${{ matrix.arch }}.dmg
           fi 
 
       - name: Upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
+          VERSION="${TAG_NAME#v}"
           gh release upload ${{ needs.release.outputs.tag_name }} \
-            dist/PulmoRisk-mac-${{ matrix.arch }}.dmg
+            dist/PulmoRisk-mac-${VERSION}-${{ matrix.arch }}.dmg

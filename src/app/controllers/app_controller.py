@@ -3,11 +3,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import certifi
 import customtkinter as ctk
 
 from app.controllers.base_controller import BaseController
 from app.utils.event_bus import AppEvent, EventBus
 from app.utils.helpers import find_integral_cli
+
+os.environ["CURL_CA_BUNDLE"] = certifi.where()
 
 
 class AppController(BaseController):

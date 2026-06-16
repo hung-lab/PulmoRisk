@@ -43,14 +43,14 @@ DIST_DIR="$PROJECT_ROOT/dist"
 
 APP_NAME="PulmoRisk"
 APP_ID="pulmorisk"
-VERSION="${VERSION:-1.3.4}"
+VERSION="${VERSION:-0.0.0}"
 ARCH="x86_64"     # used for the AppImage filename
 DEB_ARCH="amd64"  # Debian's arch naming convention
 
 APP_EXEC="${APP_ID}"
 APP_PATH="$DIST_DIR/$APP_NAME"
 
-APPIMAGE_NAME="${APP_NAME}-${ARCH}.AppImage"
+APPIMAGE_NAME="${APP_NAME}-${VERSION}-${ARCH}.AppImage"
 APPIMAGE_PATH="$DIST_DIR/$APPIMAGE_NAME"
 
 DEB_NAME="${APP_ID}_${VERSION}_${DEB_ARCH}.deb"
@@ -174,7 +174,7 @@ create_desktop_file() {
 
     cat > "$APP_PATH/$APP_NAME.desktop" << EOF
 [Desktop Entry]
-Version=1.0
+Version=$VERSION
 Type=Application
 Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool
@@ -335,7 +335,7 @@ EOF
     # Create desktop file
     cat > "$PKG_DIR/usr/share/applications/$APP_NAME.desktop" << EOF
 [Desktop Entry]
-Version=1.0
+Version=$VERSION
 Type=Application
 Name=$APP_NAME
 Comment=Lung Cancer risk prediction tool

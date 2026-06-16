@@ -18,6 +18,10 @@ dependencies = [
     # PyRadiomics stack
     "scikit-image<0.23",
     "scipy==1.13.1",
+
+    "certifi>=2025.0.0,<2027.0.0",
+    "requests>=2.32,<3.0",
+    "urllib3>=2.2,<3.0",
 ]
 
 [tool.uv]
