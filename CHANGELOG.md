@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.9...v1.4.0) (2026-06-17)
+
+
+### Features
+
+* implement batch processing for INTEGRAL-radiomics as well as some bug fixes and code improvements ([3061aa0](https://github.com/hung-lab/Lung_cancer_risk_models/commit/3061aa0c494d0c722c529fd529d8992601e00307))
+
 ## [1.3.9](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.3.8...v1.3.9) (2026-06-16)
 
 
