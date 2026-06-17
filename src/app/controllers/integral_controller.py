@@ -5,17 +5,27 @@ import os
 import subprocess
 import tempfile
 import threading
+import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from app.controllers.base_controller import BaseController
+from app.models.patient_model import IntegralClinicalData
 from app.utils.event_bus import AppEvent
-from app.utils.helpers import find_rscript, format_percent
+from app.utils.helpers import (
+    InvalidFileError,
+    find_rscript,
+    format_percent,
+    validate_file_path,
+)
+from app.utils.integral_inference import run_inference_pipeline
+from app.utils.validators import BatchIntegralRowParser, ParseError
 
-if TYPE_CHECKING:
-    from app.models.patient_model import IntegralRadiomicsInput
+SEX_OPTIONS = {
+    "Male": 0,
+    "Female": 1,
+}
 
 
 class IntegralController(BaseController):
@@ -24,10 +34,12 @@ class IntegralController(BaseController):
 
         self._pending = None
         self._running = False
+        self._batch_active = False
+        self._batch_cancel = False
 
     # ─────────────────────────────── RUN ───────────────────────────────
 
-    def run(self, data: IntegralRadiomicsInput) -> None:
+    def run(self, data: IntegralClinicalData) -> None:
         self._pending = data
         self._set_state("running")
 
@@ -35,6 +47,16 @@ class IntegralController(BaseController):
         self._progress(0.3)
 
         threading.Thread(target=self._infer, daemon=True).start()
+
+    def run_batch(self, csv_path: str) -> None:
+        thread = threading.Thread(
+            target=self._run_batch_worker, args=(csv_path,), daemon=True
+        )
+        thread.start()
+
+    def cancel_batch(self):
+        self._batch_cancel = True
+        self._log("Cancelling batch...", "WARNING")
 
     # ─────────────────────────────── INFERENCE ─────────────────────────
 
@@ -57,15 +79,15 @@ class IntegralController(BaseController):
                     {
                         "image": payload["image"],
                         "mask": payload["mask"],
-                        "age": int(payload["epi_age"]),
-                        "sex": 1 if payload["epi_female"] else 0,
-                        "bmi": float(payload["epi_bmi"]),
-                        "fhlc": int(payload["epi_fhlc"]),
-                        "copdemph": int(payload["epi_copdemph"]),
-                        "formersmk": int(payload["epi_formersmk"]),
-                        "duration": int(payload["epi_duration"]),
-                        "cigday": int(payload["epi_cigday"]),
-                        "quittime": int(payload["epi_quittime"]),
+                        "age": int(payload["age"]),
+                        "sex": 1 if payload["female"] else 0,
+                        "bmi": float(payload["bmi"]),
+                        "fhlc": int(payload["fhlc"]),
+                        "copdemph": int(payload["copdemph"]),
+                        "formersmk": int(payload["formersmk"]),
+                        "duration": int(payload["duration"]),
+                        "cigday": int(payload["cigday"]),
+                        "quittime": int(payload["quittime"]),
                     }
                 ]
             )
@@ -157,19 +179,19 @@ class IntegralController(BaseController):
 
     # ─────────────────────────────── DATA PREP ─────────────────────────
 
-    def _prepare_payload(self, data: IntegralRadiomicsInput) -> dict:
+    def _prepare_payload(self, data: IntegralClinicalData) -> dict:
         return {
-            "epi_age": data.clinical.epi_age,
-            "epi_female": data.clinical.epi_female,
-            "epi_fhlc": data.clinical.epi_fhlc,
-            "epi_copdemph": data.clinical.epi_copdemph,
-            "epi_formersmk": data.clinical.epi_formersmk,
-            "epi_duration": data.clinical.epi_duration,
-            "epi_cigday": data.clinical.epi_cigday,
-            "epi_quittime": data.clinical.epi_quittime,
-            "epi_bmi": data.clinical.epi_bmi,
-            "image": data.clinical.image_file,
-            "mask": data.clinical.mask_file,
+            "age": data.age,
+            "female": data.female,
+            "fhlc": data.fhlc,
+            "copdemph": data.copdemph,
+            "formersmk": data.formersmk,
+            "duration": data.duration,
+            "cigday": data.cigday,
+            "quittime": data.quittime,
+            "bmi": data.bmi,
+            "image": data.image_file,
+            "mask": data.mask_file,
         }
 
     # ─────────────────────────────── RESULT ─────────────────────────────
@@ -192,3 +214,119 @@ class IntegralController(BaseController):
         )
 
         self._set_state("idle")
+
+    def _row_to_patient(self, row) -> IntegralClinicalData:
+        try:
+            parsed = BatchIntegralRowParser.parse(dict(row))
+        except ParseError as exc:
+            # surface the exact column that failed
+            raise ValueError(f"Column '{exc.field}': {exc.message}") from exc
+
+        # ModelValidationError (out-of-range etc.) propagates naturally —
+        # the batch loop already catches Exception and logs it per-row.
+        return IntegralClinicalData(**parsed)
+
+    def _run_batch_worker(self, csv_path: str) -> None:
+        try:
+            self._batch_active = True
+            self._batch_cancel = False
+
+            df = pd.read_csv(csv_path)
+            results = []
+
+            total = len(df)
+
+            self._set_state("running_batch")
+            self._log(f"Starting batch run: {total} patients")
+
+            for i, row in df.iterrows():
+                self._emit(
+                    AppEvent(
+                        type="batch_progress",
+                        data={
+                            "current": i + 1,
+                            "total": total,
+                        },
+                    )
+                )
+                self._log(f"Completed {i}/{total}")
+
+                if self._batch_cancel:
+                    self._log("Batch cancelled by user", "WARNING")
+
+                    remaining = total - len(results)
+
+                    results.extend(
+                        [
+                            {
+                                "pred_benign": None,
+                                "pred_malignant": None,
+                                "error": "cancelled",
+                            }
+                            for _ in range(remaining)
+                        ]
+                    )
+                    break
+
+                try:
+                    patient = self._row_to_patient(row)
+
+                    try:
+                        validate_file_path(Path(patient.image_file), "image_file")
+                        validate_file_path(Path(patient.mask_file), "mask_file")
+                    except InvalidFileError as e:
+                        self._warn(
+                            f"Row {i + 1} skipped: {e.field_name} invalid ({e.reason})"
+                        )
+                        results.append(
+                            {
+                                "pred_benign": None,
+                                "pred_malignant": None,
+                                "error": f"{e.field_name} invalid ({e.reason})",
+                            }
+                        )
+                        continue
+
+                    self._log(f"Running inference on row {i + 1} for patient: ")
+
+                    prediction = run_inference_pipeline(patient)
+
+                    results.append(
+                        {
+                            "pred_benign": prediction[0],
+                            "pred_malignant": prediction[1],
+                            "error": None,
+                        }
+                    )
+
+                except Exception as e:
+                    self._error(f"Row {i + 1} failed: {e}")
+                    self._error(traceback.format_exc())
+                    results.append(
+                        {
+                            "pred_benign": None,
+                            "pred_malignant": None,
+                            "error": str(e),
+                        }
+                    )
+                    break
+
+            df["pred_benign"] = [r["pred_benign"] for r in results]
+            df["pred_malignant"] = [r["pred_malignant"] for r in results]
+            df["error"] = [r["error"] for r in results]
+
+            output_path = str(Path(csv_path).with_suffix(""))
+            output_path = output_path + "_scored.csv"
+
+            df.to_csv(output_path, index=False)
+
+            self._batch_active = False
+            self._set_state("idle")
+
+            self._emit(
+                AppEvent(type="radiomics_result", data={"output_path": output_path})
+            )
+        except Exception as e:
+            self._error("Batch crashed completely")
+            self._error(str(e))
+            self._error(traceback.format_exc())

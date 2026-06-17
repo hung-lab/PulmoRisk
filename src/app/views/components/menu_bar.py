@@ -11,10 +11,8 @@ import customtkinter as ctk
 
 from app.config.settings import (
     ERROR_COLOUR,
-    __author__,
-    __build_date__,
-    __version__,
 )
+from app.config.version import BUILD_DATE, VERSION
 from app.utils.ui_config import CARD_PAD_X, SPACE_MD, SPACE_SM
 from app.views.dialogs.info_dialog import InfoDialog
 
@@ -92,8 +90,7 @@ class MenuBar:
 
     def _build_help_menu(self, menubar: tk.Menu) -> None:
         menu = tk.Menu(menubar, tearoff=0)
-        menu.add_command(label="About Lung Cancer Screening", command=self.show_about)
-        menu.add_command(label="About This App", command=self.show_app_info)
+        menu.add_command(label="About PulmoRisk", command=self.show_app_info)
         menubar.add_cascade(label="Help", menu=menu)
 
     # ──────────────────────────────────────────────── commands ──
@@ -137,27 +134,12 @@ class MenuBar:
     def change_appearance_mode(self, mode: str) -> None:
         self.controller.change_appearance(mode)
 
-    def show_about(self) -> None:
-        """Display a brief info dialog about lung cancer screening."""
-        InfoDialog(
-            self.root,
-            title="About Lung Cancer Screening",
-            message=(
-                "This tool uses the Sybil model combined with epidemiological "
-                "risk factors to estimate 6-year lung cancer risk."
-            ),
-        )
-
     def show_app_info(self) -> None:
         """Display application version and author info."""
         InfoDialog(
             self.root,
-            title="About This App",
-            message=(
-                f"Version:     {__version__}\n"
-                f"Build date:  {__build_date__}\n"
-                f"Author:      {__author__}"
-            ),
+            title="About PulmoRisk",
+            message=(f"Version:     {VERSION}\nBuild date:  {BUILD_DATE}\n"),
         )
 
     def set_enabled(self, enabled: bool) -> None:

@@ -8,10 +8,15 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
-from app.config.settings import BORDER_COLOUR, ERROR_COLOUR
+from app.config.settings import (
+    BORDER_COLOUR,
+    ERROR_COLOUR,
+    WARNING_COLOUR,
+    WARNING_COLOUR_HOVER,
+)
 from app.models.patient_model import (
     IntegralClinicalData,
-    IntegralRadiomicsInput,
+    ModelValidationError,
 )
 from app.utils.event_bus import AppEvent
 from app.utils.helpers import format_percent
@@ -28,7 +33,7 @@ from app.utils.ui_config import (
     SPACE_SM,
     SPACE_XS,
 )
-from app.utils.validators import IntegralValidator  # reuse validator logic
+from app.utils.validators import FieldParser, ParseError
 from app.views.components.loading_overlay import RunningOverlay
 
 if TYPE_CHECKING:
@@ -49,7 +54,6 @@ class IntegralView:
         self.controller = controller
 
         self._running = False
-        self.validator = IntegralValidator()
 
         # ── clinical vars ───────────────────────────────
         self._age_var = tk.StringVar()
@@ -78,6 +82,9 @@ class IntegralView:
 
         self.run_button: ctk.CTkButton | None = None
         self._results_frame: ctk.CTkFrame | None = None
+
+        self._mode_var = tk.StringVar(value="single")
+
         self._entries: dict[str, ctk.CTkEntry] = {}
 
         self._setup_ui()
@@ -93,6 +100,37 @@ class IntegralView:
         self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
+        # ─────────────────────────────────────────────────────────────
+        # MODE SELECTOR
+        # ─────────────────────────────────────────────────────────────
+
+        top = ctk.CTkFrame(self.root, fg_color="transparent", border_width=0)
+        top.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=SECTION_GAP_TOP,
+            pady=(SECTION_GAP_TOP, 0),
+        )
+
+        ctk.CTkLabel(
+            top,
+            text="Run Mode",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w", pady=(0, SPACE_XS))
+
+        self._mode_switch = ctk.CTkSegmentedButton(
+            top,
+            values=["single", "batch"],
+            variable=self._mode_var,
+            command=self._on_mode_changed,
+        )
+        self._mode_switch.pack(anchor="w")
+
+        # ─────────────────────────────────────────────────────────────
+        # Scroll container
+        # ─────────────────────────────────────────────────────────────
+
         self.container = ctk.CTkScrollableFrame(self.root, border_width=0)
         self.container.grid(
             row=1,
@@ -101,24 +139,103 @@ class IntegralView:
             padx=SECTION_GAP_TOP,
             pady=SECTION_GAP_BOTTOM,
         )
+        self.container.grid_columnconfigure(0, weight=1)
 
+        # ─────────────────────────────────────────────────────────────
+        # Header
+        # ─────────────────────────────────────────────────────────────
         ctk.CTkLabel(
             self.container,
-            text="INTEGRAL Radiomics Risk Model",
+            text="INTEGRAL-Radiomics Pulmonary Nodule Malignancy Model",
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(anchor="w", pady=(SPACE_MD, SPACE_XS))
 
-        ctk.CTkLabel(
+        self._subtitle = ctk.CTkLabel(
             self.container,
-            text="Enter clinical + radiomics features",
+            text="Enter clinical and demographic features",
             text_color=("gray40", "gray90"),
-        ).pack(anchor="w", pady=(0, SPACE_LG))
+        )
+        self._subtitle.pack(anchor="w", pady=(0, SPACE_LG))
 
-        self._card("Clinical Data", self._build_clinical)
-        self._card("Smoking History", self._build_smoking)
-        self._card("Image files", self._build_ct)
+        # ─────────────────────────────────────────────────────────────
+        # Single patient UI
+        # ─────────────────────────────────────────────────────────────
+        self._single_frame = ctk.CTkFrame(
+            self.container,
+            fg_color="transparent",
+            border_width=0,
+        )
+        self._single_frame.pack(fill="both", expand=True)
 
-        # results card (hidden until a run completes)
+        self._card("Clinical Data", self._build_clinical, self._single_frame)
+        self._card("Smoking History", self._build_smoking, self._single_frame)
+        self._card(
+            "Image files (Must be NRRD files with .nrrd extension)",
+            self._build_ct,
+            self._single_frame,
+        )
+
+        # ─────────────────────────────────────────────────────────────
+        # Batch UI
+        # ─────────────────────────────────────────────────────────────
+        self._batch_frame = ctk.CTkFrame(
+            self.container,
+            fg_color="transparent",
+            border_width=0,
+        )
+
+        batch_card = ctk.CTkFrame(self._batch_frame)
+        batch_card.pack(fill="x", pady=CARD_PAD_Y, padx=CARD_PAD_X)
+
+        ctk.CTkLabel(
+            batch_card,
+            text="Batch CSV Processing",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(anchor="w", padx=SECTION_GAP_BOTTOM, pady=(SPACE_SM, SPACE_XS))
+
+        ctk.CTkLabel(
+            batch_card,
+            text=(
+                "Upload a CSV containing patient metadata and CT scan image and mask files.\n\n"
+                "Required columns:\n"
+                "- image_file (Path to image (NRRD format))\n"
+                "- mask_file (Path to nodule mask (NRRD format))\n"
+                "- age (Years [0 - 100])\n"
+                "- female (0 = male, 1 = female)\n"
+                "- bmi (Body mass index (kg/m^2) [15.0 - 50.0])\n"
+                "- fhlc (family lung cancer history: 0 or 1)\n"
+                "- copdemph (OPD / emphysema: 0 or 1)\n"
+                "- formersmk (former smoker: 0 or 1)\n"
+                "- duration (smoking duration (years) [0 - age])\n"
+                "- cigday (cigarettes per day [0 - 100])\n"
+                "- quittime (years since quitting [0 - age])\n\n"
+            ),
+            justify="left",
+            anchor="w",
+        ).pack(anchor="w", padx=SECTION_GAP_BOTTOM, pady=(0, SPACE_MD))
+
+        self.batch_select_button = ctk.CTkButton(
+            batch_card,
+            text="Select CSV File",
+            command=self._on_batch_submit,
+            fg_color=WARNING_COLOUR,
+            hover_color=WARNING_COLOUR_HOVER,
+        )
+        self.batch_select_button.pack(
+            anchor="w",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(0, SPACE_MD),
+        )
+
+        # hidden initially
+        self._batch_frame.pack_forget()
+
+        # ─────────────────────────────────────────────────────────────
+        # Results card
+        # ─────────────────────────────────────────────────────────────
+
+        # hidden until a run completes
+
         self._results_frame = ctk.CTkFrame(
             self.container, border_color=ERROR_COLOUR, border_width=3
         )
@@ -131,7 +248,11 @@ class IntegralView:
         )
         self._results_label.pack(anchor="w", padx=SPACE_LG, pady=SPACE_MD)
 
-        bottom = ctk.CTkFrame(self.root, fg_color="transparent")
+        # ─────────────────────────────────────────────────────────────
+        # Bottom action bar
+        # ─────────────────────────────────────────────────────────────
+
+        bottom = ctk.CTkFrame(self.root, fg_color="transparent", border_width=0)
         bottom.grid(
             row=2, column=0, sticky="ew", padx=BUTTON_GAP, pady=(SPACE_XS, BUTTON_GAP)
         )
@@ -139,7 +260,7 @@ class IntegralView:
 
         self.run_button = ctk.CTkButton(
             bottom,
-            text="Run INTEGRAL Model",
+            text="Run INTEGRAL-Radiomics",
             height=44,
             command=self._on_submit,
         )
@@ -150,8 +271,8 @@ class IntegralView:
 
     # ─────────────────────────────── CARD HELPER ─────────────────────────
 
-    def _card(self, title: str, builder) -> None:
-        frame = ctk.CTkFrame(self.container)
+    def _card(self, title: str, builder, parent: ctk.CTkFrame) -> None:
+        frame = ctk.CTkFrame(parent)
         frame.pack(fill="x", pady=CARD_PAD_Y, padx=CARD_PAD_X)
 
         ctk.CTkLabel(frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(
@@ -181,34 +302,34 @@ class IntegralView:
 
     # ─────────────────────────────── SECTIONS ────────────────────────────
 
-    def _build_clinical(self, p):
-        self._entry(p, "age", "Age", self._age_var, self._age_error)
-        self._entry(p, "bmi", "BMI", self._bmi_var, self._bmi_error)
+    def _build_clinical(self, p: ctk.CTkFrame):
+        self._entry(p, "age", "Age (years)", self._age_var, self._age_error)
+        self._entry(p, "bmi", "BMI (kg/m^2) ", self._bmi_var, self._bmi_error)
         self._dropdown(p, "Sex", self._gender_var, list(SEX_OPTIONS.keys()))
 
-        self._switch(p, "Family lung cancer history", self._fhlc_var)
+        self._switch(p, "Family history of lung cancer", self._fhlc_var)
         self._switch(p, "COPD / emphysema", self._copd_var)
 
-    def _build_smoking(self, p):
+    def _build_smoking(self, p: ctk.CTkFrame):
         self._switch(p, "Former smoker", self._former_smoker_var)
         self._entry(
             p,
             "duration",
-            "Smoking duration",
+            "Smoking duration (years)",
             self._duration_var,
             self._smoking_duration_error_var,
         )
         self._entry(
             p,
             "cigday",
-            "Cigarettes/day",
+            "Smoking intensity (cig/day)",
             self._cigday_var,
             self._smoking_intensity_error_var,
         )
         self._entry(
             p,
-            "quit",
-            "Years since quitting",
+            "quittime",
+            "Quit time (years)",
             self._quit_var,
             self._smoking_quit_time_error_var,
         )
@@ -249,7 +370,7 @@ class IntegralView:
         error.grid(row=0, column=1, sticky="w", pady=(SPACE_XS, 0))
 
         r = self._row(p)
-        self._label(r, "CT Mask")
+        self._label(r, "Nodule Mask")
 
         container = ctk.CTkFrame(
             r, width=INPUT_WIDTH, fg_color="transparent", border_width=0
@@ -342,14 +463,16 @@ class IntegralView:
 
     # ─────────────────────────────── OVERLAY CONTROL ─────────────────────
 
-    def _show_overlay(self) -> None:
+    def _show_overlay(self, batch_mode=False) -> None:
         self._running = True
         self.run_button.configure(state="disabled")
         self._set_widgets_state("disabled")
 
         # reset overlay to initial state
         self._overlay.show(
-            title="Running model...", stage="Preparing inference pipeline"
+            title="Running model...",
+            stage="Preparing inference pipeline",
+            batch_mode=batch_mode,
         )
 
     def _hide_overlay(self) -> None:
@@ -401,6 +524,42 @@ class IntegralView:
         self._show_overlay()
         self.controller.run(data)
 
+    def _on_batch_submit(self) -> None:
+        if self._running:
+            return
+
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+
+        if not file_path:
+            return
+
+        self._emit("log", f"Selected batch file: {file_path}")
+
+        self._overlay.set_cancel_callback(self.controller.cancel_batch)
+
+        self.controller.run_batch(file_path)
+
+    def _on_mode_changed(self, _=None) -> None:
+        mode = self._mode_var.get()
+
+        if mode == "single":
+            self._batch_frame.pack_forget()
+            self._single_frame.pack(fill="both", expand=True)
+
+            self.run_button.grid()
+
+            self._subtitle.configure(text="Enter clinical + radiomics features")
+
+        else:
+            self._single_frame.pack_forget()
+            self._batch_frame.pack(fill="both", expand=True)
+
+            self.run_button.grid_remove()
+
+            self._subtitle.configure(
+                text="Run INTEGRAL-Radiomics on multiple individuals"
+            )
+
     def reset(self) -> None:
         """Clear all inputs and results — called by new_run action."""
         self._age_var.set("")
@@ -438,106 +597,77 @@ class IntegralView:
         else:
             entry.configure(border_color=BORDER_COLOUR)
 
-    def _collect(self) -> IntegralRadiomicsInput:
+    def _collect(self) -> IntegralClinicalData:
+        """Collect and return validated form data."""
+        parse_errors: dict[str, str] = {}
 
-        def validate_field(key, var, err_var, name, min_v=None, max_v=None):
-            value = var.get()
-            result, errors = self.validator.validate_field(value, name, min_v, max_v)
+        # ── 1. Parse strings → Python types ────────────────────────────────
+        # Collect ALL parse errors before raising so every bad field is shown.
+        fields: dict = {}
 
-            err_var.set("\n".join(f"• {e}" for e in errors) if errors else "")
+        for field, var, label in [
+            ("age", self._age_var, "Age"),
+            ("duration", self._duration_var, "Smoking duration"),
+            ("cigday", self._cigday_var, "Cig/day"),
+            ("quittime", self._quit_var, "Smoking quit time"),
+        ]:
+            try:
+                fields[field] = FieldParser.int(field, var.get(), label)
+            except ParseError as exc:
+                parse_errors[exc.field] = exc.message
 
-            self.set_entry_error_state(key, err_var)
+        try:
+            fields["bmi"] = FieldParser.float("bmi", self._bmi_var.get(), "BMI")
+        except ParseError as exc:
+            parse_errors[exc.field] = exc.message
 
-            return result, errors
+        if parse_errors:
+            self._show_field_errors(parse_errors)  # highlight bad fields
+            raise ValueError("Please fix the highlighted fields.")
 
-        # ───────────────────────── CLINICAL ─────────────────────────
-
-        age, age_errors = validate_field(
-            "age", self._age_var, self._age_error, "Age", 0, 120
+        # ── 2. Map dropdowns / booleans ────────────────────────────────────
+        fields.update(
+            female=SEX_OPTIONS[self._gender_var.get()],
+            fhlc=int(self._fhlc_var.get()),
+            copdemph=int(self._copd_var.get()),
+            formersmk=int(self._former_smoker_var.get()),
+            image_file=self._image_file_var.get()
+            if self._image_file_var.get() != "No file selected"
+            else None,
+            mask_file=self._mask_file_var.get()
+            if self._mask_file_var.get() != "No file selected"
+            else None,
         )
 
-        bmi, bmi_errors = validate_field(
-            "bmi", self._bmi_var, self._bmi_error, "BMI", 0, 100
-        )
+        # ── 3. Construct model — __post_init__ validates business rules ─────
+        try:
+            return IntegralClinicalData(**fields)
+        except ModelValidationError as exc:
+            self._show_field_errors(exc.field_errors)  # same helper, same UI path
+            raise ValueError("Please fix the highlighted fields.") from exc
 
-        duration, duration_errors = validate_field(
-            "duration",
-            self._duration_var,
-            self._smoking_duration_error_var,
-            "Duration",
-            0,
-            100,
-        )
-
-        cigday, cigday_errors = validate_field(
-            "cigday",
-            self._cigday_var,
-            self._smoking_intensity_error_var,
-            "Cig/day",
-            0,
-            200,
-        )
-
-        quit_time, quit_errors = validate_field(
-            "quit",
-            self._quit_var,
-            self._smoking_quit_time_error_var,
-            "Quit time",
-            0,
-            100,
-        )
-
-        # ───────────────────────── RADIOMICS ─────────────────────────
-
-        ct_errors = []
-        image_error = ""
-        mask_error = ""
-
-        if self._image_file_var.get() == "No file selected":
-            image_error = "Image file is required"
-            ct_errors.append(image_error)
-
-        if self._mask_file_var.get() == "No file selected":
-            mask_error = "Mask file is required"
-            ct_errors.append(mask_error)
-
-        self._image_file_error.set(image_error)
-        self._mask_file_error.set(mask_error)
-
-        # ───────────────────────── BLOCK IF INVALID ─────────────────────────
-        # ── collect all errors ──────────────────────
-
-        all_errors = (
-            age_errors
-            + bmi_errors
-            + duration_errors
-            + cigday_errors
-            + quit_errors
-            + ct_errors
-        )
-
-        if all_errors:
-            raise ValueError(" | ".join(all_errors))
-
-        # ───────────────────────── BUILD MODEL INPUT ─────────────────────────
-
-        clinical = IntegralClinicalData(
-            epi_age=age,
-            epi_female=SEX_OPTIONS[self._gender_var.get()],
-            epi_fhlc=int(self._fhlc_var.get()),
-            epi_copdemph=int(self._copd_var.get()),
-            epi_formersmk=int(self._former_smoker_var.get()),
-            epi_duration=duration,
-            epi_cigday=cigday,
-            epi_quittime=quit_time,
-            epi_bmi=bmi,
-            image_file=self._image_file_var.get(),
-            mask_file=self._mask_file_var.get(),
-        )
-
-        return IntegralRadiomicsInput(
-            clinical=clinical,
-        )
+    def _show_field_errors(self, errors: dict[str, str]) -> None:
+        """Update error StringVars and highlight entry borders."""
+        # map model field names → (error_var, entry_key)
+        _MAP = {
+            "age": (self._age_error, "age"),
+            "bmi": (self._bmi_error, "bmi"),
+            "duration": (self._smoking_duration_error_var, "smoking_duration"),
+            "cigday": (
+                self._smoking_intensity_error_var,
+                "smoking_intensity",
+            ),
+            "quittime": (self._smoking_quit_time_error_var, "smoking_quit"),
+            "image_file": (self._image_file_error, None),
+            "mask_file": (self._mask_file_error, None),
+        }
+        self._clear_errors()
+        for field, msg in errors.items():
+            if field in _MAP:
+                err_var, entry_key = _MAP[field]
+                err_var.set(f"• {msg}")
+                if entry_key:
+                    self.set_entry_error_state(entry_key, err_var)
 
     # ─────────────────────────────── RESULTS ─────────────────────────────
     def _format_result(self, lung_cancer_prob):
@@ -566,6 +696,14 @@ class IntegralView:
             value = max(0.0, min(1.0, event.value or 0.0))
             self._overlay.set_progress(value)
 
+        elif event.type == "batch_progress":
+            current = event.data["current"]
+            total = event.data["total"]
+            self._overlay.set_batch_progress(
+                current,
+                total,
+            )
+            self._overlay.set_stage(f"Running patient {current} of {total}")
         # ───────────────────────────── LOGGING ──────────────────────────────
         elif event.type == "log":
             if self._running and event.message:
@@ -573,20 +711,27 @@ class IntegralView:
 
         # ───────────────────────────── STATE ────────────────────────────────
         elif event.type == "ui_state":
-            if event.message == "running":
-                self._show_overlay()
+            if event.message == "running_single":
+                self._show_overlay(batch_mode=False)
+
+            elif event.message == "running_batch":
+                self._show_overlay(batch_mode=True)
+
             elif event.message in ("idle", "error"):
                 self._hide_overlay()
 
         # ───────────────────────────── RESULT ───────────────────────────────
         elif event.type == "radiomics_result":
-            if not event.data or "probability" not in event.data:
+            if isinstance(event.data, dict) and "output_path" in event.data:
+                self._show_results(f"Batch complete:\n{event.data['output_path']}")
+
+            elif not event.data or "probability" not in event.data:
                 return
 
-            lung_cancer_prob = event.data.get("probability", 0.0)
-
-            # format display
-            result_dict = self._format_result(lung_cancer_prob)
-            lines = "\n".join(f"{k}: {v}" for k, v in result_dict.items())
-            self._show_results(lines)
-            self._hide_overlay()
+            else:
+                lung_cancer_prob = event.data.get("probability", 0.0)
+                # format display
+                result_dict = self._format_result(lung_cancer_prob)
+                lines = "\n".join(f"{k}: {v}" for k, v in result_dict.items())
+                self._show_results(lines)
+                self._hide_overlay()

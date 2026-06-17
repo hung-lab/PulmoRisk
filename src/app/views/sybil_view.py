@@ -13,7 +13,7 @@ from app.config.settings import (
     WARNING_COLOUR,
     WARNING_COLOUR_HOVER,
 )
-from app.models.patient_model import SybilInputData
+from app.models.patient_model import ModelValidationError, SybilInputData
 from app.utils.event_bus import AppEvent
 from app.utils.ui_config import (
     BUTTON_GAP,
@@ -28,7 +28,7 @@ from app.utils.ui_config import (
     SPACE_SM,
     SPACE_XS,
 )
-from app.utils.validators import SybilValidator
+from app.utils.validators import FieldParser, ParseError
 from app.views.components.loading_overlay import RunningOverlay
 
 if TYPE_CHECKING:
@@ -67,7 +67,6 @@ class SybilView:
         self.controller = controller
 
         self._running = False
-        self.validator = SybilValidator()
 
         # ── form state vars ───────────────────────────────────────────────
         self._age_var = tk.StringVar()
@@ -158,13 +157,13 @@ class SybilView:
         # ─────────────────────────────────────────────────────────────
         ctk.CTkLabel(
             self.container,
-            text="Sybil Epi Lung Cancer Risk Model",
+            text="Sybil-Epi Lung Cancer Risk Model",
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(anchor="w", pady=(SPACE_MD, SPACE_XS))
 
         self._subtitle = ctk.CTkLabel(
             self.container,
-            text="Enter patient information to compute risk score",
+            text="Enter information to compute risk score",
             text_color=("gray40", "gray90"),
         )
         self._subtitle.pack(anchor="w", pady=(0, SPACE_LG))
@@ -179,7 +178,7 @@ class SybilView:
         )
         self._single_frame.pack(fill="both", expand=True)
 
-        self._card("Patient Demographics", self._build_patient, self._single_frame)
+        self._card("Demographics", self._build_patient, self._single_frame)
         self._card("Medical History", self._build_history, self._single_frame)
         self._card("Smoking History", self._build_smoking, self._single_frame)
         self._card("CT Scan", self._build_ct, self._single_frame)
@@ -272,7 +271,7 @@ class SybilView:
 
         self.run_button = ctk.CTkButton(
             bottom,
-            text="Run Risk Model",
+            text="Run Sybil-Epi",
             height=44,
             command=self._on_submit,
         )
@@ -322,8 +321,8 @@ class SybilView:
 
     def _build_history(self, p: ctk.CTkFrame) -> None:
         self._switch(p, "COPD", self._copd_var)
-        self._switch(p, "Family lung cancer history", self._family_lc_var)
-        self._switch(p, "Personal cancer history", self._personal_cancer_var)
+        self._switch(p, "Family history of lung cancer", self._family_lc_var)
+        self._switch(p, "Personal history of any cancer", self._personal_cancer_var)
 
     def _build_smoking(self, p: ctk.CTkFrame) -> None:
         self._switch(p, "Current smoker", self._smoking_status_var)
@@ -529,9 +528,7 @@ class SybilView:
 
             self.run_button.grid()
 
-            self._subtitle.configure(
-                text="Enter patient information to compute risk score"
-            )
+            self._subtitle.configure(text="Enter information to compute risk score")
 
         else:
             self._single_frame.pack_forget()
@@ -539,7 +536,7 @@ class SybilView:
 
             self.run_button.grid_remove()
 
-            self._subtitle.configure(text="Run Sybil inference across a CSV batch")
+            self._subtitle.configure(text="Run Sybil-Epi on multiple individuals")
 
     def reset(self) -> None:
         """Clear all inputs and results — called by new_run action."""
@@ -568,6 +565,13 @@ class SybilView:
         self._smoking_quit_time_error_var.set("")
         self._six_year_risk_error_var.set("")
 
+        self._clear_error_state()
+
+    def _clear_error_state(self) -> None:
+        for entry in self._entries.values():
+            if entry.winfo_exists():
+                entry.configure(border_color=BORDER_COLOUR)
+
     # ─────────────────────────────── VALIDATION ──────────────────────────
 
     def set_entry_error_state(self, key: str, error_var: tk.StringVar):
@@ -582,105 +586,78 @@ class SybilView:
             entry.configure(border_color=BORDER_COLOUR)
 
     def _collect(self) -> SybilInputData:
+        """Collect and return validated form data."""
+        parse_errors: dict[str, str] = {}
 
-        def validate_field(key, var, err_var, name, min_v=None, max_v=None):
-            value = var.get()
-            result, errors = self.validator.validate_field(value, name, min_v, max_v)
+        # ── 1. Parse strings → Python types ────────────────────────────────
+        # Collect ALL parse errors before raising so every bad field is shown.
+        fields: dict = {}
 
-            err_var.set("\n".join(f"• {e}" for e in errors) if errors else "")
+        for field, var, label in [
+            ("age", self._age_var, "Age"),
+            ("bmi", self._bmi_var, "BMI"),
+            ("smoking_duration", self._smoking_duration_var, "Smoking duration"),
+            ("smoking_intensity", self._smoking_intensity_var, "Smoking intensity"),
+            ("smoking_quit_time", self._smoking_quit_time_var, "Smoking quit time"),
+        ]:
+            try:
+                fields[field] = FieldParser.float(field, var.get(), label)
+            except ParseError as exc:
+                parse_errors[exc.field] = exc.message
 
-            self.set_entry_error_state(key, err_var)
-
-            return result, errors
-
-        # ── validate fields ─────────────────────────
-
-        age, age_errors = validate_field(
-            "age", self._age_var, self._age_error_var, "Age", 0, 99
-        )
-        bmi, bmi_errors = validate_field(
-            "bmi", self._bmi_var, self._bmi_error_var, "BMI", 0, 99
-        )
-        smoking_dur, smoking_dur_errors = validate_field(
-            "smoking_duration",
-            self._smoking_duration_var,
-            self._smoking_duration_error_var,
-            "Smoking duration",
-            0,
-            99,
-        )
-        smoking_intensity, smoking_intensity_errors = validate_field(
-            "smoking_intensity",
-            self._smoking_intensity_var,
-            self._smoking_intensity_error_var,
-            "Smoking intensity",
-            0,
-            1000,
-        )
-        smoking_quit, smoking_quit_errors = validate_field(
-            "smoking_quit",
-            self._smoking_quit_time_var,
-            self._smoking_quit_time_error_var,
-            "Smoking quit time",
-            0,
-            99,
-        )
-        six_year_risk = None
-        six_year_risk_errors = []
-        six_year_risk_val = self._six_year_risk.get().strip()
-        if six_year_risk_val:
-            six_year_risk, six_year_risk_errors = validate_field(
-                "risk",
-                self._six_year_risk,
-                self._six_year_risk_error_var,
-                "6-year Risk Sybil",
-                0.0,
-                1.0,
+        try:
+            fields["six_year_risk"] = FieldParser.optional_float(
+                "six_year_risk", self._six_year_risk.get(), "6-year Sybil risk"
             )
+        except ParseError as exc:
+            parse_errors[exc.field] = exc.message
 
-        # CT scan special case
-        ct_errors = []
-        if not six_year_risk_val and self._ct_dir_var.get() == "No folder selected":
-            ct_errors.append("CT folder is required")
+        if parse_errors:
+            self._show_field_errors(parse_errors)  # highlight bad fields
+            raise ValueError("Please fix the highlighted fields.")
 
-        self._ct_error_var.set(
-            "\n".join(f"• {e}" for e in ct_errors) if ct_errors else ""
-        )
-
-        # ── collect all errors ──────────────────────
-
-        all_errors = (
-            age_errors
-            + bmi_errors
-            + smoking_dur_errors
-            + smoking_intensity_errors
-            + smoking_quit_errors
-            + ct_errors
-            + six_year_risk_errors
-        )
-
-        if all_errors:
-            raise ValueError(" | ".join(all_errors))
-
-        # ── map dropdown labels to integer codes ──────────────────────────
-        education = EDUCATION_OPTIONS.get(self._education_var.get(), 1)
-        ethnicity = ETHNICITY_OPTIONS.get(self._ethnicity_var.get(), 1)
-
-        return SybilInputData(
-            age=age,
-            bmi=bmi,
+        # ── 2. Map dropdowns / booleans ────────────────────────────────────
+        fields.update(
             copd=int(self._copd_var.get()),
-            education=education,
-            ethnicity=ethnicity,
+            education=EDUCATION_OPTIONS.get(self._education_var.get(), 1),
+            ethnicity=ETHNICITY_OPTIONS.get(self._ethnicity_var.get(), 1),
             family_lc_history=int(self._family_lc_var.get()),
             personal_cancer_history=int(self._personal_cancer_var.get()),
-            smoking_duration=smoking_dur,
-            smoking_intensity=smoking_intensity,
-            smoking_quit_time=smoking_quit,
             smoking_status=int(self._smoking_status_var.get()),
-            ct_scan_dir=self._ct_dir_var.get(),
-            six_year_risk=six_year_risk,
+            ct_scan_dir=self._ct_dir_var.get()
+            if self._ct_dir_var.get() != "No folder selected"
+            else None,
         )
+
+        # ── 3. Construct model — __post_init__ validates business rules ─────
+        try:
+            return SybilInputData(**fields)
+        except ModelValidationError as exc:
+            self._show_field_errors(exc.field_errors)  # same helper, same UI path
+            raise ValueError("Please fix the highlighted fields.") from exc
+
+    def _show_field_errors(self, errors: dict[str, str]) -> None:
+        """Update error StringVars and highlight entry borders."""
+        # map model field names → (error_var, entry_key)
+        _MAP = {
+            "age": (self._age_error_var, "age"),
+            "bmi": (self._bmi_error_var, "bmi"),
+            "smoking_duration": (self._smoking_duration_error_var, "smoking_duration"),
+            "smoking_intensity": (
+                self._smoking_intensity_error_var,
+                "smoking_intensity",
+            ),
+            "smoking_quit_time": (self._smoking_quit_time_error_var, "smoking_quit"),
+            "ct_scan_dir": (self._ct_error_var, None),
+            "six_year_risk": (self._six_year_risk_error_var, "risk"),
+        }
+        self._clear_errors()
+        for field, msg in errors.items():
+            if field in _MAP:
+                err_var, entry_key = _MAP[field]
+                err_var.set(f"• {msg}")
+                if entry_key:
+                    self.set_entry_error_state(entry_key, err_var)
 
     # ─────────────────────────────── RESULTS ─────────────────────────────
 

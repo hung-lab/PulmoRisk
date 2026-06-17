@@ -1,124 +1,175 @@
+"""UI-layer input parsing.
+
+These classes only parse raw strings from form widgets into Python types.
+Business validation rules (ranges, required fields, mutual exclusion) live
+in the model dataclasses via ``__post_init__``.  This keeps the validators
+small and makes the models self-validating regardless of which code path
+constructs them.
+
+Typical usage in a view::
+
+    try:
+        age = FieldParser.float("age", age_str, "Age")
+        ...
+        data = SybilInputData(age=age, ...)   # validation happens here
+    except ParseError as exc:
+        # show exc.field / exc.message in the UI before the model is built
+        ...
+    except ModelValidationError as exc:
+        # field_errors maps field name → message for UI highlighting
+        for field, msg in exc.field_errors.items():
+            ...
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
+
+# ---------------------------------------------------------------------------
+# Parse-only error (bad string input before the model is even constructed)
+# ---------------------------------------------------------------------------
 
 
 @dataclass
-class ValidationResult:
-    value: float | int | str | None
-    errors: list[str]
+class ParseError(Exception):
+    """Raised when a raw string cannot be converted to the expected type."""
+
+    field: str
+    message: str
+
+    def __str__(self) -> str:
+        return f"{self.field}: {self.message}"
 
 
-class SybilValidator:
-    # ── basic checks ─────────────────────────────
+# ---------------------------------------------------------------------------
+# String → Python type parsers
+# ---------------------------------------------------------------------------
+
+
+class FieldParser:
+    """Stateless helpers that convert widget strings to typed values.
+
+    Raises :class:`ParseError` on conversion failure so the view can
+    surface the problem before attempting to construct a model.
+    """
 
     @staticmethod
-    def required(value: str, name: str) -> list[str]:
-        if not value.strip():
-            return [f"{name} is required"]
-        return []
-
-    @staticmethod
-    def to_float(value: str, name: str) -> ValidationResult:
+    def float(field: str, raw: str, label: str | None = None) -> float:
+        display = label or field
+        stripped = raw.strip()
+        if not stripped:
+            raise ParseError(field, f"{display} is required")
         try:
-            return ValidationResult(float(value), [])
+            return float(stripped)
         except ValueError:
-            return ValidationResult(None, [f"{name} must be a number"])
+            raise ParseError(field, f"{display} must be a number")
 
     @staticmethod
-    def range(value: float, name: str, min_v: float, max_v: float) -> list[str]:
-        if not (min_v <= value <= max_v):
-            return [f"{name} must be between {min_v} and {max_v}"]
-        return []
+    def int(field: str, raw: str, label: str | None = None) -> int:
+        display = label or field
+        stripped = raw.strip()
+        if not stripped:
+            raise ParseError(field, f"{display} is required")
+        try:
+            return int(stripped)
+        except ValueError:
+            raise ParseError(field, f"{display} must be a whole number")
 
-    # ── full field pipeline ─────────────────────
+    @staticmethod
+    def optional_float(field: str, raw: str, label: str | None = None) -> float | None:
+        """Return ``None`` for blank strings; parse otherwise."""
+        stripped = raw.strip()
+        if not stripped:
+            return None
+        return FieldParser.float(field, raw, label)
+
+    @staticmethod
+    def required_str(field: str, raw: str, label: str | None = None) -> str:
+        display = label or field
+        stripped = raw.strip()
+        if not stripped:
+            raise ParseError(field, f"{display} is required")
+        return stripped
+
+
+# ---------------------------------------------------------------------------
+# Batch CSV row coercer
+# ---------------------------------------------------------------------------
+
+
+class BatchSybilRowParser:
+    """Coerce a CSV row (dict of strings) to typed values for SybilInputData.
+
+    Returns a dict ready to unpack as ``SybilInputData(**row_dict)``.
+    Raises :class:`ParseError` on the first malformed cell so the batch
+    worker can log the offending column and row index.
+    """
+
+    _FLOAT_FIELDS = (
+        "age",
+        "bmi",
+        "smoking_duration",
+        "smoking_intensity",
+        "smoking_quit_time",
+    )
+    _INT_FIELDS = (
+        "copd",
+        "education",
+        "ethnicity",
+        "family_lc_history",
+        "personal_cancer_history",
+        "smoking_status",
+    )
 
     @classmethod
-    def validate_field(
-        cls,
-        value: str,
-        name: str,
-        min_v: float | None = None,
-        max_v: float | None = None,
-    ) -> tuple[float | None, list[str]]:
+    def parse(cls, row: dict) -> dict:
+        out: dict = {}
 
-        errors = []
+        for f in cls._FLOAT_FIELDS:
+            out[f] = FieldParser.float(f, str(row.get(f, "")), f.replace("_", " "))
 
-        # required
-        errors += cls.required(value, name)
-        if errors:
-            return None, errors
+        for f in cls._INT_FIELDS:
+            out[f] = FieldParser.int(f, str(row.get(f, "")), f.replace("_", " "))
 
-        # float conversion
-        result = cls.to_float(value, name)
-        errors += result.errors
-        if errors:
-            return None, errors
+        out["ct_scan_dir"] = row.get("ct_scan_dir") or None
+        out["six_year_risk"] = FieldParser.optional_float(
+            "six_year_risk", str(row.get("six_year_risk", ""))
+        )
 
-        num = result.value
-
-        # range check
-        if min_v is not None and max_v is not None:
-            errors += cls.range(num, name, min_v, max_v)
-
-        return num, errors
+        return out
 
 
-class IntegralValidator(SybilValidator):
-    # ───────────────────────────── INT VALIDATION ─────────────────────────
+class BatchIntegralRowParser:
+    """Coerce a CSV row (dict of strings) to typed values for IntegralClinicalData.
 
-    @staticmethod
-    def to_int(value: str, name: str) -> ValidationResult:
-        try:
-            return ValidationResult(int(value), [])
-        except ValueError:
-            return ValidationResult(None, [f"{name} must be an integer"])
+    Returns a dict ready to unpack as ``IntegralClinicalData(**row_dict)``.
+    Raises :class:`ParseError` on the first malformed cell so the batch
+    worker can log the offending column and row index.
+    """
 
-    # ───────────────────────────── BINARY VALIDATION ──────────────────────
-
-    @staticmethod
-    def binary(value: str, name: str) -> ValidationResult:
-        try:
-            v = int(value)
-            if v not in (0, 1):
-                return ValidationResult(None, [f"{name} must be 0 or 1"])
-            return ValidationResult(v, [])
-        except ValueError:
-            return ValidationResult(None, [f"{name} must be 0 or 1"])
-
-    # ───────────────────────────── DICT VALIDATION (RADIO) ────────────────
-
-    @staticmethod
-    def validate_radiomics(features: dict) -> list[str]:
-        """
-        Ensures radiomics payload is safe for R model.
-        """
-        errors = []
-
-        if not isinstance(features, dict):
-            return ["Radiomics must be a JSON object"]
-
-        if len(features) == 0:
-            return ["Radiomics features cannot be empty"]
-
-        for k, v in features.items():
-            if v is None:
-                errors.append(f"{k} is missing")
-                continue
-
-            try:
-                float(v)
-            except Exception:
-                errors.append(f"{k} must be numeric")
-
-        return errors
-
-    # ───────────────────────────── FULL PIPELINE HELPERS ──────────────────
+    _FLOAT_FIELDS = ("bmi",)
+    _INT_FIELDS = (
+        "age",
+        "female",
+        "fhlc",
+        "copdemph",
+        "formersmk",
+        "duration",
+        "cigday",
+        "quittime",
+    )
 
     @classmethod
-    def clinical_field(
-        cls,
-        value: str,
-        name: str,
-        min_v: float | None = None,
-        max_v: float | None = None,
-    ):
-        return cls.validate_field(value, name, min_v, max_v)
+    def parse(cls, row: dict) -> dict:
+        out: dict = {}
+
+        for f in cls._FLOAT_FIELDS:
+            out[f] = FieldParser.float(f, str(row.get(f, "")), f.replace("_", " "))
+
+        for f in cls._INT_FIELDS:
+            out[f] = FieldParser.int(f, str(row.get(f, "")), f.replace("_", " "))
+
+        out["image_file"] = row.get("image_file") or None
+        out["mask_file"] = row.get("mask_file") or None
+
+        return out

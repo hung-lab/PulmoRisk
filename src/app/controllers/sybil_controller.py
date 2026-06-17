@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import time
+import traceback
 from dataclasses import asdict
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from app.utils.event_bus import AppEvent, EventBus
 from app.utils.helpers import validate_ct_path
 from app.utils.sybil_epi import calculate_sybil_epi_score, epi_input_from_patient_data
 from app.utils.sybil_inference import run_sybil_pipeline
+from app.utils.validators import BatchSybilRowParser, ParseError
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
@@ -148,24 +150,15 @@ class SybilController(BaseController):
         self._set_state("idle")
 
     def _row_to_patient(self, row) -> SybilInputData:
-        def get(key, default=""):
-            return row.get(key, default)
+        try:
+            parsed = BatchSybilRowParser.parse(dict(row))
+        except ParseError as exc:
+            # surface the exact column that failed
+            raise ValueError(f"Column '{exc.field}': {exc.message}") from exc
 
-        return SybilInputData(
-            age=float(get("age", 0)),
-            bmi=float(get("bmi", 0)),
-            copd=int(get("copd", 0)),
-            education=int(get("education", 1)),
-            ethnicity=int(get("ethnicity", 1)),
-            family_lc_history=int(get("family_lc_history", 0)),
-            personal_cancer_history=int(get("personal_cancer_history", 0)),
-            smoking_duration=float(get("smoking_duration", 0)),
-            smoking_intensity=float(get("smoking_intensity", 0)),
-            smoking_quit_time=float(get("smoking_quit_time", 0)),
-            smoking_status=int(get("smoking_status", 0)),
-            ct_scan_dir=get("ct_scan_dir"),
-            six_year_risk=float(get("six_year_risk")) if get("six_year_risk") else None,
-        )
+        # ModelValidationError (out-of-range etc.) propagates naturally —
+        # the batch loop already catches Exception and logs it per-row.
+        return SybilInputData(**parsed)
 
     def _run_batch_worker(self, csv_path: str) -> None:
         try:
@@ -231,8 +224,6 @@ class SybilController(BaseController):
                     )
 
                 except Exception as e:
-                    import traceback
-
                     self._error(f"Row {i + 1} failed: {e}")
                     self._error(traceback.format_exc())
                     results.append(
@@ -255,8 +246,6 @@ class SybilController(BaseController):
 
             self._emit(AppEvent(type="sybil_result", data={"output_path": output_path}))
         except Exception as e:
-            import traceback
-
             self._error("Batch crashed completely")
             self._error(str(e))
             self._error(traceback.format_exc())

@@ -113,16 +113,10 @@ class TestUtilityImports:
             ACCENT_LIGHT,
             ACCENT_DARK,
             ERROR_COLOUR,
-            __version__,
-            __author__,
-            __build_date__,
         )
 
         assert isinstance(LEVEL_COLOURS, dict)
         assert isinstance(LEVEL_PREFIX, dict)
-        assert isinstance(__version__, str)
-        assert isinstance(__author__, str)
-        assert isinstance(__build_date__, str)
         assert all(k in LEVEL_COLOURS for k in ("INFO", "SUCCESS", "WARNING", "ERROR"))
         assert all(k in LEVEL_PREFIX for k in ("INFO", "SUCCESS", "WARNING", "ERROR"))
 

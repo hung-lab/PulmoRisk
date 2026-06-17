@@ -103,7 +103,7 @@ class MainWindow:
         _add_link("View on GitHub", "https://github.com/hung-lab/Sybil-Epi")
         text.insert("end", "\n\n")
 
-        text.insert("end", "Integral Radiomics\n\n", "heading")
+        text.insert("end", "INTEGRAL-Radiomics\n\n", "heading")
         text.insert(
             "end",
             "Applies radiomic feature extraction to quantify imaging biomarkers "
@@ -125,13 +125,20 @@ class MainWindow:
         text.configure(state="disabled")
 
         # ── disclaimer ────────────────────────────────────────────────────────
-        ctk.CTkLabel(
+        disclaimer_label = ctk.CTkLabel(
             content,
             text="⚠  This tool is intended for research and clinical decision support only. "
             "Results should be interpreted by a qualified clinician and do not constitute a diagnosis.",
-            wraplength=520,
             justify="left",
             anchor="w",
             text_color=ERROR_COLOUR,
             font=ctk.CTkFont(size=12),
-        ).grid(row=1, column=0, sticky="w", padx=SPACE_MD, pady=(SPACE_XS, SPACE_MD))
+        )
+        disclaimer_label.grid(
+            row=1, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_XS, SPACE_MD)
+        )
+
+        def _update_disclaimer_wrap(event):
+            disclaimer_label.configure(wraplength=max(100, event.width - 2 * SPACE_MD))
+
+        content.bind("<Configure>", _update_disclaimer_wrap)

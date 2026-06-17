@@ -16,6 +16,7 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Run Release Please
         id: release
@@ -23,6 +24,18 @@ jobs:
         with:
           release-type: simple
           target-branch: main
+
+      - name: Compute version
+        id: version
+        run: |
+          if [ "${{ steps.release.outputs.release_created }}" != "true" ]; then
+            echo "version=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          TAG="${{ steps.release.outputs.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build-linux:
     needs: release
@@ -52,6 +65,17 @@ jobs:
             fuse \
             libfuse2 \
             wget
+
+      - name: Generate version.py
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          DATE=$(date +%F)
+
+          cat > src/app/config/version.py << EOF
+          VERSION = "${VERSION}"
+          BUILD_DATE = "${DATE}"
+          EOF
 
       - name: Run Linux build script
         env:
@@ -96,6 +120,18 @@ jobs:
       - name: Generate .ico
         run: |
           magick src/app/assets/icons/app_icon.png -define icon:auto-resize=256,128,64,48,32,16 src/app/assets/icons/app_icon.ico
+
+      - name: Generate version.py
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          $DATE = Get-Date -Format "yyyy-MM-dd"
+
+          @"
+          VERSION = '$env:VERSION'
+          BUILD_DATE = '$DATE'
+          "@ | Set-Content src/app/config/version.py
 
       - name: Build with PyInstaller
         run: uv run pyinstaller --clean --noconfirm pulmorisk-windows.spec
@@ -159,6 +195,17 @@ jobs:
 
       - name: Install create-dmg
         run: brew install create-dmg
+
+      - name: Generate version.py
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          DATE=$(date +%F)
+
+          cat > src/app/config/version.py << EOF
+          VERSION = "${VERSION}"
+          BUILD_DATE = "${DATE}"
+          EOF
 
       - name: Build with PyInstaller
         run: uv run pyinstaller --clean --noconfirm pulmorisk-mac.spec

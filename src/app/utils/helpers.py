@@ -11,6 +11,13 @@ import customtkinter as ctk
 from app.config.settings import PROJECT_ROOT
 
 
+class InvalidFileError(Exception):
+    def __init__(self, field_name: str, reason: str):
+        self.field_name = field_name
+        self.reason = reason
+        super().__init__(f"{field_name}: {reason}")
+
+
 def get_mono_font(size=14):
     available = set(tkfont.families())
 
@@ -108,6 +115,15 @@ def validate_ct_path(path: Path) -> tuple[bool, str]:
     if not any(path.iterdir()):
         return False, "Directory is empty"
     return True, ""
+
+
+def validate_file_path(path: Path, field_name: str) -> None:
+    if not path.exists():
+        raise InvalidFileError(field_name, "path does not exist")
+    if not path.is_file():
+        raise InvalidFileError(field_name, "not a file")
+    if path.suffix.lower() != ".nrrd":
+        raise InvalidFileError(field_name, "not a nrrd file")
 
 
 def find_rscript() -> str | None:
