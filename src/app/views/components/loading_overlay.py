@@ -89,6 +89,7 @@ class RunningOverlay:
         self._bar.stop()
         self.disable_batch_mode()
         self._frame.lower()
+        self._cancel_callback = None
 
     def enable_batch_mode(self):
         self._batch_bar.set(0)

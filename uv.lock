@@ -675,7 +675,7 @@ wheels = [
 
 [[package]]
 name = "pulmorisk"
-version = "1.1.5"
+version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },

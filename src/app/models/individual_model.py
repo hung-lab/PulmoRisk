@@ -94,7 +94,7 @@ class SybilInputData:
     smoking_intensity: float  # cigarettes/day
     smoking_quit_time: float  # years since quitting
     smoking_status: int  # 0 = former, 1 = current
-    ct_scan_dir: str | None = str(PROJECT_ROOT)
+    ct_scan_dir: str | None = None
     six_year_risk: float | None = None  # optional pre-computed Sybil score
 
     def __post_init__(self) -> None:
@@ -158,7 +158,7 @@ class SybilInputData:
                 "6-year Sybil risk",
             )
         else:
-            if not self.ct_scan_dir or str(self.ct_scan_dir) == str(PROJECT_ROOT):
+            if not self.ct_scan_dir:
                 errors["ct_scan_dir"] = "CT scan folder is required"
 
         if errors:

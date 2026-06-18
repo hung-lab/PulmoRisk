@@ -244,7 +244,7 @@ class IntegralController(BaseController):
                         },
                     )
                 )
-                self._log(f"Completed {i}/{total}")
+                self._log(f"Completed {i + 1}/{total}")
 
                 if self._batch_cancel:
                     self._log("Batch cancelled by user", "WARNING")
