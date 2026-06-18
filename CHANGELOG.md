@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.4](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.3...v1.4.4) (2026-06-18)
+
+
+### Bug Fixes
+
+* minor fixes for some dangling bugs ([94de0be](https://github.com/hung-lab/Lung_cancer_risk_models/commit/94de0bee2d2ede979b103e759758f58054954740))
+* more minor bug fixes ([b21c730](https://github.com/hung-lab/Lung_cancer_risk_models/commit/b21c730b02cf26c72f372e38a8ecd36ffb618971))
+
 ## [1.4.3](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.2...v1.4.3) (2026-06-18)
 
 
