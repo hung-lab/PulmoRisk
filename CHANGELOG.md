@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.2...v1.4.3) (2026-06-18)
+
+
+### Bug Fixes
+
+* rename from patient to individual ([7b2f5bc](https://github.com/hung-lab/Lung_cancer_risk_models/commit/7b2f5bc61fdd80a5d0bc3c90ed6051f3058726b2))
+
 ## [1.4.2](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.1...v1.4.2) (2026-06-18)
 
 
