@@ -113,11 +113,12 @@ jobs:
         env:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
-          $DATE = Get-Date -Format "yyyy-MM-dd"
+          $VERSION = $env:TAG_NAME -replace '^v', ''
+          $DATE    = Get-Date -Format "yyyy-MM-dd"
 
           @"
-          $VERSION = $env:TAG_NAME -replace '^v',''
-          BUILD_DATE = '$DATE'
+          VERSION = "$VERSION"
+          BUILD_DATE = "$DATE"
           "@ | Set-Content src/app/config/version.py
 
       - name: Build with PyInstaller
@@ -188,10 +189,11 @@ jobs:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
           DATE=$(date +%F)
-
-          cat > src/app/config/version.py << EOF
           VERSION="${TAG_NAME#v}"
-          BUILD_DATE = "${DATE}"
+
+          cat > src/app/config/version.py << 'EOF'
+          VERSION = "$VERSION"
+          BUILD_DATE = "$DATE"
           EOF
 
       - name: Build with PyInstaller

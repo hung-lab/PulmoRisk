@@ -41,7 +41,7 @@ class IntegralController(BaseController):
 
     def run(self, data: IntegralClinicalData) -> None:
         self._pending = data
-        self._set_state("running")
+        self._set_state("running_single")
 
         self._log("Running INTEGRAL model (R subprocess)...")
         self._progress(0.3)
@@ -93,13 +93,15 @@ class IntegralController(BaseController):
             )
             df.to_csv(tmp_csv, index=False)
 
+            r_path = str(tmp_csv).replace("\\", "/")
+
             # R code to predict and output JSON
             r_code = f"""
             .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
             library(integralrad)
             library(jsonlite)
 
-            preds <- predict_integral_radiomics("{tmp_csv}")
+            preds <- predict_integral_radiomics("{r_path}")
             cat(toJSON(preds, dataframe="rows"))
             """
 
@@ -152,14 +154,7 @@ class IntegralController(BaseController):
             self._log(f"Prediction result: {row}")
 
             # Find probability column
-            probability = None
-
             probability = float(row["pred_malignant"])
-
-            if probability is None:
-                raise RuntimeError(
-                    f"Could not locate probability column in output: {list(row.keys())}"
-                )
 
             self._progress(0.8)
 
@@ -174,7 +169,7 @@ class IntegralController(BaseController):
             self._set_state("error")
 
         finally:
-            if tmp_csv.exists():
+            if "tmp_csv" in locals() and tmp_csv.exists():
                 tmp_csv.unlink()
 
     # ─────────────────────────────── DATA PREP ─────────────────────────
@@ -330,3 +325,4 @@ class IntegralController(BaseController):
             self._error("Batch crashed completely")
             self._error(str(e))
             self._error(traceback.format_exc())
+            self._set_state("idle")

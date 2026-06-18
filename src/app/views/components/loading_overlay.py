@@ -236,8 +236,7 @@ class RunningOverlay:
         self._log_box.pack()
 
         # Configure per-level colour tags
-        for level, colour in LEVEL_COLOURS.items():
-            self._log_box.tag_config(level.lower(), foreground=colour[0])
+        self.update_tag_colours(ctk.get_appearance_mode())
 
     def _tick(self) -> None:
         """Increment the elapsed-time counter every second while visible."""
@@ -261,3 +260,12 @@ class RunningOverlay:
             text="Cancelling...",
             state="disabled",
         )
+
+    def update_tag_colours(self, mode: str) -> None:
+        """Sync log-box tag colours to the current appearance mode."""
+        if mode == "System":
+            # resolve to what the OS is actually using
+            mode = ctk.get_appearance_mode()
+        for level, colours in LEVEL_COLOURS.items():
+            colour = colours[0] if mode == "Light" else colours[1]
+            self._log_box.tag_config(level.lower(), foreground=colour)

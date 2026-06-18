@@ -713,10 +713,13 @@ class SybilView:
         elif event.type == "sybil_result":
             if isinstance(event.data, dict) and "output_path" in event.data:
                 self._show_results(f"Batch complete:\n{event.data['output_path']}")
-                # self._hide_overlay()
+                self._hide_overlay()
             elif event.data:
                 yearly = event.data.get("yearly", [])
                 epi = event.data.get("epi", 0.0)
                 lines = [f"Year {i + 1}: {v:.1%}" for i, v in enumerate(yearly)]
                 lines += ["", f"Final 6-year risk: {epi:.1%}"]
                 self._show_results("\n".join(lines))
+
+        elif event.type == "ui_theme":
+            self._overlay.update_tag_colours(event.message)

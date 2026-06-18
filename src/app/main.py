@@ -96,7 +96,7 @@ def main() -> None:
     bus.subscribe(integral_form.handle_event)
 
     # ── Controllers ───────────────────────────────────────────────────────
-    app_ctrl = AppController(root, bus, split, sybil_form)
+    app_ctrl = AppController(root, bus, split, sybil_form, integral_form)
 
     menubar_ctrl = MenuBarController(root, bus, app_ctrl)
     menu = MenuBar(root, menubar_ctrl)

@@ -17,10 +17,11 @@ os.environ["CURL_CA_BUNDLE"] = certifi.where()
 class AppController(BaseController):
     """Handles top-level UI events: layout toggles, theme, lifecycle."""
 
-    def __init__(self, root, bus: EventBus, split_view, sybil_form):
+    def __init__(self, root, bus: EventBus, split_view, sybil_form, integral_form):
         super().__init__(root, bus)
         self._split = split_view
-        self._form = sybil_form
+        self._form_sybil = sybil_form
+        self._form_integral = integral_form
         bus.subscribe(self._handle_event)
 
     def _handle_event(self, event: AppEvent):
@@ -36,7 +37,8 @@ class AppController(BaseController):
 
         elif event.type == "action":
             if event.message == "new_run":
-                self._form.reset()
+                self._form_sybil.reset()
+                self._form_integral.reset()
 
         elif event.type == "ui_theme":
             ctk.set_appearance_mode(event.message or "System")
@@ -77,7 +79,6 @@ class AppController(BaseController):
             pass
         return "jammy"
 
-    @staticmethod
     def _cran_repo(self, CH):
         system = platform.system().lower()
 
@@ -159,7 +160,7 @@ class AppController(BaseController):
             r_lib.mkdir(parents=True, exist_ok=True)
 
             # ── 4. Detect PPM  URL by OS ──────────────
-            ppm_url = self._cran_repo()
+            ppm_url = self._cran_repo(CH)
 
             # ── 5. R install script ───────────────────────────────────────
             #

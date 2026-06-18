@@ -602,7 +602,7 @@ class IntegralView:
     def reset(self) -> None:
         """Clear all inputs and results — called by new_run action."""
         self._age_var.set("")
-        self._gender_var.set(SEX_OPTIONS["Male"])
+        self._gender_var.set("Male")
         self._fhlc_var.set(False)
         self._copd_var.set(False)
         self._former_smoker_var.set(False)
@@ -789,3 +789,6 @@ class IntegralView:
                 lines = "\n".join(f"{k}: {v}" for k, v in result_dict.items())
                 self._show_results(lines)
                 self._hide_overlay()
+
+        elif event.type == "ui_theme":
+            self._overlay.update_tag_colours(event.message)
