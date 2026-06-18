@@ -64,42 +64,47 @@ A modern, production-ready tkinter application with uv, Docker, and CI/CD.
 tkinter-app/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml          # CI pipeline
-│       └── release.yml     # Multi-platform releases
+│       ├── ci.yml                        # CI pipeline
+│       └── release.yml                   # Multi-platform releases
 
 ├── src/
 │   └── app/
 │       ├── __init__.py
-│       ├── assets/         # Icons, logos, images, styles
-│       ├── config/         # Config files, Application settings
+│       ├── assets/                       # Icons, themes
+│       ├── config/                       # Config files, Application settings
 │       │   ├── __init__.py
 │       │   └── settings.py
-│       ├── main.py         # Application entry point
-│       ├── models.py       # Data models
-│       ├── views/          # UI components
+│       ├── main.py                       # Application entry point
+│       ├── models/                       # Data models
+│       ├── views/                        # UI components
 │       │   ├── __init__.py
-│           └── components/ # Reusable UI components
-│           └── dialogs/    # Dialog Windows
+│           └── components/               # Reusable UI components
+│           └── dialogs/                  # Dialog Windows
 │       │   └── main_view.py
-│       └── controllers/    # Business logic
+│       └── controllers/                  # Business logic
 │           ├── __init__.py
 │           └── app_controller.py
 │           └── base_controller.py
-│       └── utils/                      # Utility functions
+│       └── utils/                        # Utility functions
 │           ├── __init__.py
-│           └── event_bus.py            # Threading logic
-│           └── helpers.py              # Helper functions
-│           └── sybil_epi.py            # Sybil Epi Scoring implementation
+│           └── event_bus.py              # Threading logic
+│           └── helpers.py                # Helper functions
+│           └── sybil_epi.py              # Sybil Epi Scoring implementation
 ├── tests/
 ├── scripts/
-│   └── build.py           # Build script for distribution
-├── pyproject.toml         # Project configuration
-├── uv.lock               # Dependency lock file
-├── Dockerfile            # Container configuration
-├── docker-compose.yml    # Docker services
-├── .dockerignore         # Docker ignore file
-├── .gitignore            # Git ignore file
-└── README.md             # This file
+│   └── build_linux.sh                    # Build script for linux distribution
+│   └── convert_icon.py                   # Script to convert PNG icon to Windows .ico and macOS .icns
+├── pyproject.toml                        # Project configuration
+├── pulmorisk.spec                        # Spec file for pyinstaller for linux build
+├── pulmorisk-mac.spec                    # Spec file for pyinstaller for MacOS build
+├── pulmorisk-windows.spec                # Spec file for pyinstaller for Windows build
+├── uv.lock                               # Dependency lock file
+├── Dockerfile                            # Container configuration
+├── docker-compose.yml                    # Docker services
+├── .dockerignore                         # Docker ignore file
+├── .gitignore                            # Git ignore file
+├── CHANGELOG.md                          # Release please auto generated changelog
+└── README.md                             # This file
 ```
 
 ## Architecture
@@ -138,12 +143,12 @@ Conventional commits [cheatsheet](https://gist.github.com/qoomon/5dfcdf8eec66a05
 When you create a release on GitHub, the workflow automatically builds and packages your application for:
 - **Windows** - Executable with installer
 - **macOS** - App bundle
-- **Linux** - Binary package
+- **Linux** - Appimage and deb package
 
 ### CI Pipeline
 
 The CI pipeline runs on every push and pull request:
-- Test across Python 3.9, 3.10, 3.11, and 3.12
+- Test across Python 3.10
 - Run security scans with Bandit
 - Lint code with Ruff
 - Check for potential issues
@@ -188,7 +193,7 @@ Ruff is configured with:
 ### Local Build
 
 ```bash
-uv run python scripts/build.py
+./build_linux.sh both
 ```
 
 This creates a standalone executable in the `dist/` directory.
