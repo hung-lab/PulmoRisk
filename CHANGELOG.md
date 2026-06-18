@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.5](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.4...v1.4.5) (2026-06-18)
+
+
+### Bug Fixes
+
+* bug with mac update version and build date ([aaf08a3](https://github.com/hung-lab/Lung_cancer_risk_models/commit/aaf08a3b9e6e2ae4c84b35b7c7fd6ff97729c383))
+
 ## [1.4.4](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.3...v1.4.4) (2026-06-18)
 
 
