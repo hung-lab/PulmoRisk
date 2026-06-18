@@ -18,17 +18,17 @@ sys.modules.setdefault("sybil.serie", MagicMock())
 
 class TestModelImports:
     def test_sybil_input_data_imports(self):
-        from app.models.patient_model import SybilInputData
+        from app.models.individual_model import SybilInputData
 
         assert SybilInputData is not None
 
     def test_risk_result_imports(self):
-        from app.models.patient_model import RiskResult
+        from app.models.individual_model import RiskResult
 
         assert RiskResult is not None
 
     def test_sybil_input_data_constructs(self):
-        from app.models.patient_model import SybilInputData
+        from app.models.individual_model import SybilInputData
 
         obj = SybilInputData(
             age=65,
@@ -47,7 +47,7 @@ class TestModelImports:
         assert obj.age == 65
 
     def test_risk_result_constructs(self):
-        from app.models.patient_model import RiskResult
+        from app.models.individual_model import RiskResult
 
         obj = RiskResult(yearly_scores=[0.01] * 6, epi_score=0.12)
         assert len(obj.yearly_scores) == 6
@@ -76,25 +76,25 @@ class TestUtilityImports:
         assert bus is not None
 
     def test_validator_imports(self):
-        from app.utils.validators import SybilValidator
+        from app.utils.validators import (
+            FieldParser,
+            BatchSybilRowParser,
+            BatchIntegralRowParser,
+        )
 
-        assert SybilValidator is not None
-
-    def test_validator_constructs(self):
-        from app.utils.validators import SybilValidator
-
-        v = SybilValidator()
-        assert v is not None
+        assert FieldParser is not None
+        assert BatchSybilRowParser is not None
+        assert BatchIntegralRowParser is not None
 
     def test_sybil_epi_imports(self):
         from app.utils.sybil_epi import (
             calculate_sybil_epi_score,
-            epi_input_from_patient_data,
+            epi_input_from_individual_data,
             EpiInput,
         )
 
         assert calculate_sybil_epi_score is not None
-        assert epi_input_from_patient_data is not None
+        assert epi_input_from_individual_data is not None
         assert EpiInput is not None
 
     def test_helpers_imports(self):

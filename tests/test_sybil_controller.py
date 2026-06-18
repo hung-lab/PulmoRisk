@@ -11,7 +11,7 @@ sys.modules["sybil.serie"] = MagicMock()
 import pytest  # noqa: E402
 
 from app.controllers.sybil_controller import SybilController  # noqa: E402
-from app.models.patient_model import SybilInputData  # noqa: E402
+from app.models.individual_model import SybilInputData  # noqa: E402
 
 
 @pytest.fixture
@@ -157,7 +157,7 @@ class TestRunValidation:
 
 
 class TestOnComplete:
-    @patch("app.controllers.sybil_controller.epi_input_from_patient_data")
+    @patch("app.controllers.sybil_controller.epi_input_from_individual_data")
     @patch("app.controllers.sybil_controller.calculate_sybil_epi_score")
     def test_on_complete_emits_result_event(
         self, mock_epi, mock_epi_input, controller, pending
@@ -179,7 +179,7 @@ class TestOnComplete:
         assert result_events[0].data["yearly"] == yearly
         assert result_events[0].data["epi"] == pytest.approx(0.15)
 
-    @patch("app.controllers.sybil_controller.epi_input_from_patient_data")
+    @patch("app.controllers.sybil_controller.epi_input_from_individual_data")
     @patch("app.controllers.sybil_controller.calculate_sybil_epi_score")
     def test_on_complete_emits_idle_state(
         self, mock_epi, mock_epi_input, controller, pending
@@ -197,7 +197,7 @@ class TestOnComplete:
         ]
         assert state_events
 
-    @patch("app.controllers.sybil_controller.epi_input_from_patient_data")
+    @patch("app.controllers.sybil_controller.epi_input_from_individual_data")
     @patch("app.controllers.sybil_controller.calculate_sybil_epi_score")
     def test_on_complete_emits_progress_100(
         self, mock_epi, mock_epi_input, controller, pending
@@ -215,7 +215,7 @@ class TestOnComplete:
         ]
         assert progress_events
 
-    @patch("app.controllers.sybil_controller.epi_input_from_patient_data")
+    @patch("app.controllers.sybil_controller.epi_input_from_individual_data")
     @patch("app.controllers.sybil_controller.calculate_sybil_epi_score")
     def test_on_complete_stops_infer_active(
         self, mock_epi, mock_epi_input, controller, pending
@@ -233,7 +233,7 @@ class TestOnComplete:
         "app.controllers.sybil_controller.calculate_sybil_epi_score",
         side_effect=ValueError("bad input"),
     )
-    @patch("app.controllers.sybil_controller.epi_input_from_patient_data")
+    @patch("app.controllers.sybil_controller.epi_input_from_individual_data")
     def test_on_complete_epi_error_emits_error(
         self, mock_epi_input, mock_epi, controller, pending
     ):

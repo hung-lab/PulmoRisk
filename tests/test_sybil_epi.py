@@ -4,11 +4,11 @@ import math
 
 import pytest
 
-from app.models.patient_model import SybilInputData
+from app.models.individual_model import SybilInputData
 from app.utils.sybil_epi import (
     EpiInput,
     calculate_sybil_epi_score,
-    epi_input_from_patient_data,
+    epi_input_from_individual_data,
 )
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -189,35 +189,35 @@ class TestMonotonicity:
 
 class TestEpiInputFromPatientData:
     def test_ethnicity_white_mapped(self, base_patient):
-        epi = epi_input_from_patient_data(base_patient, 0.05)
+        epi = epi_input_from_individual_data(base_patient, 0.05)
         assert epi.ethnicity == "White"
 
     def test_ethnicity_black_mapped(self, base_patient):
         patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 2})
-        epi = epi_input_from_patient_data(patient, 0.05)
+        epi = epi_input_from_individual_data(patient, 0.05)
         assert epi.ethnicity == "Black"
 
     def test_ethnicity_asian_mapped(self, base_patient):
         patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 3})
-        epi = epi_input_from_patient_data(patient, 0.05)
+        epi = epi_input_from_individual_data(patient, 0.05)
         assert epi.ethnicity == "Asian"
 
     def test_ethnicity_others_mapped(self, base_patient):
         patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 4})
-        epi = epi_input_from_patient_data(patient, 0.05)
+        epi = epi_input_from_individual_data(patient, 0.05)
         assert epi.ethnicity == "Others"
 
     def test_invalid_ethnicity_raises(self, base_patient):
         patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 99})
         with pytest.raises(KeyError):
-            epi_input_from_patient_data(patient, 0.05)
+            epi_input_from_individual_data(patient, 0.05)
 
     def test_sybil_score_forwarded(self, base_patient):
-        epi = epi_input_from_patient_data(base_patient, 0.123)
+        epi = epi_input_from_individual_data(base_patient, 0.123)
         assert epi.risk_sybil_6_year == pytest.approx(0.123)
 
     def test_all_fields_copied(self, base_patient):
-        epi = epi_input_from_patient_data(base_patient, 0.05)
+        epi = epi_input_from_individual_data(base_patient, 0.05)
         assert epi.age == base_patient.age
         assert epi.bmi == pytest.approx(base_patient.bmi)
         assert epi.copd == base_patient.copd
@@ -230,6 +230,6 @@ class TestEpiInputFromPatientData:
         assert epi.smoking_status == base_patient.smoking_status
 
     def test_round_trip_produces_valid_score(self, base_patient):
-        epi = epi_input_from_patient_data(base_patient, 0.05)
+        epi = epi_input_from_individual_data(base_patient, 0.05)
         score = calculate_sybil_epi_score(epi)
         assert 0.0 < score < 1.0

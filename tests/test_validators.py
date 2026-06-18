@@ -1,152 +1,216 @@
-"""Tests for SybilValidator."""
-
 import pytest
 
-from app.utils.validators import SybilValidator
+from app.utils.validators import (
+    BatchIntegralRowParser,
+    BatchSybilRowParser,
+    FieldParser,
+    ParseError,
+)
+
+# ---------------------------------------------------------------------------
+# ParseError
+# ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def v():
-    return SybilValidator()
+def test_parse_error_string_representation():
+    err = ParseError("age", "Age is required")
+
+    assert err.field == "age"
+    assert err.message == "Age is required"
+    assert str(err) == "age: Age is required"
 
 
-# ── required ──────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# FieldParser.float
+# ---------------------------------------------------------------------------
 
 
-class TestRequired:
-    def test_non_empty_string_passes(self):
-        assert SybilValidator.required("hello", "Field") == []
-
-    def test_empty_string_fails(self):
-        errors = SybilValidator.required("", "Age")
-        assert errors == ["Age is required"]
-
-    def test_whitespace_only_fails(self):
-        errors = SybilValidator.required("   ", "BMI")
-        assert errors == ["BMI is required"]
-
-    def test_zero_string_passes(self):
-        assert SybilValidator.required("0", "Value") == []
-
-    def test_field_name_appears_in_error(self):
-        errors = SybilValidator.required("", "Smoking duration")
-        assert "Smoking duration" in errors[0]
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("42", 42.0),
+        ("3.14", 3.14),
+        ("  7.5  ", 7.5),
+        ("-1.2", -1.2),
+        ("0", 0.0),
+    ],
+)
+def test_float_valid_inputs(raw, expected):
+    assert FieldParser.float("age", raw, "Age") == expected
 
 
-# ── to_float ──────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize(
+    "raw,expected_msg",
+    [
+        ("", "Age is required"),
+        ("   ", "Age is required"),
+        ("abc", "Age must be a number"),
+    ],
+)
+def test_float_invalid_inputs(raw, expected_msg):
+    with pytest.raises(ParseError) as exc:
+        FieldParser.float("age", raw, "Age")
+
+    assert exc.value.field == "age"
+    assert expected_msg in exc.value.message
 
 
-class TestToFloat:
-    def test_integer_string_converts(self):
-        result = SybilValidator.to_float("42", "Age")
-        assert result.value == pytest.approx(42.0)
-        assert result.errors == []
-
-    def test_float_string_converts(self):
-        result = SybilValidator.to_float("3.14", "BMI")
-        assert result.value == pytest.approx(3.14)
-        assert result.errors == []
-
-    def test_negative_float_converts(self):
-        result = SybilValidator.to_float("-1.5", "X")
-        assert result.value == pytest.approx(-1.5)
-
-    def test_non_numeric_string_fails(self):
-        result = SybilValidator.to_float("abc", "Age")
-        assert result.value is None
-        assert result.errors == ["Age must be a number"]
-
-    def test_empty_string_fails(self):
-        result = SybilValidator.to_float("", "BMI")
-        assert result.value is None
-        assert result.errors
-
-    def test_field_name_in_error(self):
-        result = SybilValidator.to_float("xyz", "Smoking intensity")
-        assert "Smoking intensity" in result.errors[0]
+# ---------------------------------------------------------------------------
+# FieldParser.int
+# ---------------------------------------------------------------------------
 
 
-# ── range ─────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("1", 1),
+        ("0", 0),
+        ("42", 42),
+    ],
+)
+def test_int_valid_inputs(raw, expected):
+    assert FieldParser.int("x", raw, "X") == expected
 
 
-class TestRange:
-    def test_value_within_range_passes(self):
-        assert SybilValidator.range(50.0, "Age", 0, 200) == []
+@pytest.mark.parametrize(
+    "raw,expected_msg",
+    [
+        ("", "required"),
+        ("abc", "whole number"),
+        ("3.14", "whole number"),
+    ],
+)
+def test_int_invalid_inputs(raw, expected_msg):
+    with pytest.raises(ParseError) as exc:
+        FieldParser.int("x", raw, "X")
 
-    def test_value_at_lower_bound_passes(self):
-        assert SybilValidator.range(0.0, "Age", 0, 200) == []
-
-    def test_value_at_upper_bound_passes(self):
-        assert SybilValidator.range(200.0, "Age", 0, 200) == []
-
-    def test_value_below_range_fails(self):
-        errors = SybilValidator.range(-1.0, "Age", 0, 200)
-        assert errors
-
-    def test_value_above_range_fails(self):
-        errors = SybilValidator.range(201.0, "Age", 0, 200)
-        assert errors
-
-    def test_error_contains_bounds(self):
-        errors = SybilValidator.range(999.0, "BMI", 0, 100)
-        assert "0" in errors[0] and "100" in errors[0]
-
-    def test_field_name_in_error(self):
-        errors = SybilValidator.range(-5.0, "Smoking duration", 0, 200)
-        assert "Smoking duration" in errors[0]
+    assert exc.value.field == "x"
+    assert expected_msg in exc.value.message
 
 
-# ── validate_field (full pipeline) ───────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# FieldParser.optional_float
+# ---------------------------------------------------------------------------
 
 
-class TestValidateField:
-    def test_valid_value_returns_float_and_no_errors(self, v):
-        value, errors = v.validate_field("55", "Age", 0, 200)
-        assert value == pytest.approx(55.0)
-        assert errors == []
+def test_optional_float_behavior():
+    assert FieldParser.optional_float("x", "") is None
+    assert FieldParser.optional_float("x", "   ") is None
+    assert FieldParser.optional_float("x", "2.5") == 2.5
 
-    def test_empty_value_returns_required_error(self, v):
-        value, errors = v.validate_field("", "Age", 0, 200)
-        assert value is None
-        assert any("required" in e.lower() for e in errors)
 
-    def test_non_numeric_returns_conversion_error(self, v):
-        value, errors = v.validate_field("abc", "Age", 0, 200)
-        assert value is None
-        assert any("number" in e.lower() for e in errors)
+# ---------------------------------------------------------------------------
+# FieldParser.required_str
+# ---------------------------------------------------------------------------
 
-    def test_out_of_range_returns_range_error(self, v):
-        _value, errors = v.validate_field("999", "Age", 0, 200)
-        assert errors
-        assert any("between" in e.lower() for e in errors)
 
-    def test_no_range_bounds_skips_range_check(self, v):
-        value, errors = v.validate_field("9999", "X")
-        assert value == pytest.approx(9999.0)
-        assert errors == []
+def test_required_str_valid():
+    assert FieldParser.required_str("name", " Alice ") == "Alice"
 
-    def test_only_min_bound_none_skips_range(self, v):
-        # When either bound is None, range check is skipped
-        _value, errors = v.validate_field("9999", "X", None, None)
-        assert errors == []
 
-    def test_boundary_values_pass(self, v):
-        _value, errors = v.validate_field("0", "Age", 0, 200)
-        assert errors == []
-        _value, errors = v.validate_field("200", "Age", 0, 200)
-        assert errors == []
+def test_required_str_invalid():
+    with pytest.raises(ParseError):
+        FieldParser.required_str("name", "   ")
 
-    def test_whitespace_value_fails_required(self, v):
-        value, errors = v.validate_field("   ", "BMI", 0, 100)
-        assert value is None
-        assert errors
 
-    def test_returns_only_first_error_category(self, v):
-        # Empty string → required error only, no conversion error stacked on top
-        _, errors = v.validate_field("", "Age", 0, 200)
-        assert len(errors) == 1
+# ---------------------------------------------------------------------------
+# BatchSybilRowParser
+# ---------------------------------------------------------------------------
 
-    def test_float_decimal_precision(self, v):
-        value, errors = v.validate_field("22.567", "BMI", 0, 100)
-        assert value == pytest.approx(22.567)
-        assert errors == []
+
+def test_batch_sybil_row_parser_happy_path():
+    row = {
+        "age": "50",
+        "bmi": "22.5",
+        "smoking_duration": "10",
+        "smoking_intensity": "5",
+        "smoking_quit_time": "2",
+        "copd": "1",
+        "education": "3",
+        "ethnicity": "2",
+        "family_lc_history": "0",
+        "personal_cancer_history": "0",
+        "smoking_status": "1",
+        "ct_scan_dir": "/tmp/scans",
+        "six_year_risk": "0.12",
+    }
+
+    result = BatchSybilRowParser.parse(row)
+
+    assert result["age"] == 50.0
+    assert result["bmi"] == 22.5
+    assert result["smoking_duration"] == 10.0
+    assert result["copd"] == 1
+    assert result["education"] == 3
+    assert result["ct_scan_dir"] == "/tmp/scans"
+    assert result["six_year_risk"] == 0.12
+
+
+def test_batch_sybil_row_parser_missing_required_field():
+    row = {
+        "age": "abc",  # invalid float
+    }
+
+    with pytest.raises(ParseError) as exc:
+        BatchSybilRowParser.parse(row)
+
+    assert exc.value.field == "age"
+
+
+# ---------------------------------------------------------------------------
+# BatchIntegralRowParser
+# ---------------------------------------------------------------------------
+
+
+def test_batch_integral_row_parser_happy_path():
+    row = {
+        "bmi": "21.2",
+        "age": "60",
+        "female": "1",
+        "fhlc": "0",
+        "copdemph": "1",
+        "formersmk": "0",
+        "duration": "10",
+        "cigday": "5",
+        "quittime": "2",
+        "image_file": "img.nii",
+        "mask_file": "mask.nii",
+    }
+
+    result = BatchIntegralRowParser.parse(row)
+
+    assert result["bmi"] == 21.2
+    assert result["age"] == 60
+    assert result["female"] == 1
+    assert result["image_file"] == "img.nii"
+    assert result["mask_file"] == "mask.nii"
+
+
+def test_batch_integral_row_parser_optional_files():
+    row = {
+        "bmi": "21.2",
+        "age": "60",
+        "female": "1",
+        "fhlc": "0",
+        "copdemph": "1",
+        "formersmk": "0",
+        "duration": "10",
+        "cigday": "5",
+        "quittime": "2",
+    }
+
+    result = BatchIntegralRowParser.parse(row)
+
+    assert result["image_file"] is None
+    assert result["mask_file"] is None
+
+
+def test_batch_integral_row_parser_invalid_input():
+    row = {
+        "bmi": "abc",  # invalid float
+    }
+
+    with pytest.raises(ParseError) as exc:
+        BatchIntegralRowParser.parse(row)
+
+    assert exc.value.field == "bmi"

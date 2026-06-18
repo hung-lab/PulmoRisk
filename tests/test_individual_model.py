@@ -4,7 +4,7 @@ from dataclasses import asdict, fields
 
 import pytest
 
-from app.models.patient_model import RiskResult, SybilInputData
+from app.models.individual_model import RiskResult, SybilInputData
 
 # ── SybilInputData ────────────────────────────────────────────────────────────
 
