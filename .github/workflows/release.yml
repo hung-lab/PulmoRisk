@@ -191,7 +191,11 @@ jobs:
           printf 'VERSION = "%s"\nBUILD_DATE = "%s"\n' "$VERSION" "$DATE" > src/app/config/version.py
 
       - name: Build with PyInstaller
-        run: uv run pyinstaller --clean --noconfirm pulmorisk-mac.spec
+        env:
+          VERSION: ${{ needs.release.outputs.tag_name }}
+        run: |
+          export VERSION="${VERSION#v}"   # strip the "v" prefix
+          uv run pyinstaller --clean --noconfirm pulmorisk-mac.spec
 
       - name: Create DMG
         env:

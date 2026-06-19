@@ -66,14 +66,19 @@ coll = COLLECT(
     exe, a.binaries, a.zipfiles, a.datas,
     strip=False, upx=False, name="pulmorisk",
 )
+
+version = os.environ.get("VERSION", "0.0.0")
+
 app = BUNDLE(
     coll,
     name="PulmoRisk.app",
     icon="src/app/assets/icons/app_icon.icns",
-    bundle_identifier="com.yourorg.pulmorisk",
+    bundle_identifier="ca.hung-lab.pulmorisk",
     info_plist={
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "11.0",
-        "CFBundleShortVersionString": "1.0.0",
+        "CFBundleShortVersionString": version,
+        "CFBundleVersion": version,
+        "NSHumanReadableCopyright": f"Copyright © 2026",
     },
 )
