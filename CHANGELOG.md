@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.6](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.5...v1.4.6) (2026-06-19)
+
+
+### Bug Fixes
+
+* update version correctly for macos plist ([22073dd](https://github.com/hung-lab/Lung_cancer_risk_models/commit/22073ddb0e0948dc66efb7bd8a38e16cd84bb45b))
+
 ## [1.4.5](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.4...v1.4.5) (2026-06-18)
 
 
