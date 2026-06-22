@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.8](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.7...v1.4.8) (2026-06-22)
+
+
+### Bug Fixes
+
+* bug related to github url missing in versions during release and build steps ([6891024](https://github.com/hung-lab/Lung_cancer_risk_models/commit/68910240c3183f8415c17d4d4157e47cd994bb0d))
+
 ## [1.4.7](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.6...v1.4.7) (2026-06-22)
 
 
