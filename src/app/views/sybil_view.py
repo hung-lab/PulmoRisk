@@ -181,7 +181,9 @@ class SybilView:
         self._card("Demographics", self._build_individual, self._single_frame)
         self._card("Medical History", self._build_history, self._single_frame)
         self._card("Smoking History", self._build_smoking, self._single_frame)
-        self._card("CT Scan", self._build_ct, self._single_frame)
+        self._card(
+            "CT Scan (Sybil-Epi uses DICOM files)", self._build_ct, self._single_frame
+        )
 
         # ─────────────────────────────────────────────────────────────
         # Batch UI

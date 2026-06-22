@@ -12,7 +12,7 @@ import customtkinter as ctk
 from app.config.settings import (
     ERROR_COLOUR,
 )
-from app.config.version import BUILD_DATE, VERSION
+from app.config.version import BUILD_DATE, GITHUB, VERSION
 from app.utils.ui_config import CARD_PAD_X, SPACE_MD, SPACE_SM
 from app.views.dialogs.info_dialog import InfoDialog
 
@@ -140,6 +140,7 @@ class MenuBar:
             self.root,
             title="About PulmoRisk",
             message=(f"Version:     {VERSION}\nBuild date:  {BUILD_DATE}\n"),
+            github_url=GITHUB,
         )
 
     def set_enabled(self, enabled: bool) -> None:

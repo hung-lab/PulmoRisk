@@ -81,18 +81,27 @@ class MainWindow:
         text.insert(
             "end",
             "This software tool implements two validated machine learning models, "
-            "which can estimate lung cancer risk based on low-dose CT (LDCT) images and clinical and epidemiologic factors."
+            "which can estimate lung cancer risk based on low-dose CT (LDCT) images and clinical and epidemiologic factors.\n\n"
             "Two validated models are available:\n\n",
         )
 
-        text.insert("end", "Sybil-Epi\n\n", "heading")
+        text.insert("end", "Sybil-Epi\n", "heading")
         text.insert(
             "end",
             "Sybil-Epi is a lung cancer risk prediction model that integrates key clinical and epidemiologic factors with deep learning model. "
             "The analysis with Sybil-Epi requires only one single LDCT series, with no additional nodule annotation or segmentation, "
-            "combined with other 11 clinical risk factors, which are: age, BMI, education level, ethnicity, COPD history, "
-            "family lung cancer history, personal cancer history, smoking status, smoking duration, smoking intensity, "
-            "and smoking quit time.  "
+            "combined with other 11 clinical risk factors, which are: \n\n"
+            "- age\n"
+            "- BMI\n"
+            "- education level\n"
+            "- ethnicity\n"
+            "- COPD history\n"
+            "- family lung cancer history\n"
+            "- personal cancer history\n"
+            "- smoking status\n"
+            "- smoking duration\n"
+            "- smoking intensity\n"
+            "- smoking quit time\n\n"
             "More information on Sybil-Epi can be a found at ",
         )
         _add_link(
@@ -103,7 +112,7 @@ class MainWindow:
         _add_link("View on GitHub", "https://github.com/hung-lab/Sybil-Epi")
         text.insert("end", "\n\n")
 
-        text.insert("end", "INTEGRAL-Radiomics\n\n", "heading")
+        text.insert("end", "INTEGRAL-Radiomics\n", "heading")
         text.insert(
             "end",
             "Applies radiomic feature extraction to quantify imaging biomarkers "
@@ -115,12 +124,25 @@ class MainWindow:
 
         text.insert(
             "end",
-            "Select a model from the tabs above to begin. Ensure a valid CT "
-            "scan folder is available before running either model.",
+            "Select a model from the tabs above to begin. Ensure you have valid CT "
+            "scans before running either model. DICOM files for Sybil-Epi and NRRD image and nodule mask for INTEGRAL-Radiomics",
+            "subheading",
         )
 
         # style the heading tag
-        text._textbox.tag_config("heading", font=("", 13, "bold"))
+        text._textbox.tag_config(
+            "heading",
+            font=("", 16, "bold"),
+            spacing1=12,
+            spacing3=8,
+        )
+        text._textbox.tag_config(
+            "subheading",
+            font=("", 13, "bold"),
+            foreground="#FF5a5f",
+            spacing1=8,
+            spacing3=4,
+        )
 
         text.configure(state="disabled")
 
