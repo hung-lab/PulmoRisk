@@ -56,12 +56,14 @@ jobs:
       - name: Generate version.py
         env:
           VERSION: ${{ needs.release.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           DATE=$(date +%F)
 
           cat > src/app/config/version.py << EOF
           VERSION = "${VERSION#v}"
           BUILD_DATE = "${DATE}"
+          GITHUB = "https://github.com/${REPOSITORY}"
           EOF
 
       - name: Run Linux build script
@@ -112,10 +114,12 @@ jobs:
         shell: pwsh
         env:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           $VERSION = $env:TAG_NAME -replace '^v', ''
           $DATE    = Get-Date -Format "yyyy-MM-dd"
-          $content = "VERSION = `"$VERSION`"`nBUILD_DATE = `"$DATE`""
+          $GITHUB  = "https://github.com/$env:REPOSITORY"
+          $content = "VERSION = `"$VERSION`"`nBUILD_DATE = `"$DATE`"`nGITHUB_URL = `"$GITHUB`""
           Set-Content src/app/config/version.py $content
 
       - name: Build with PyInstaller
@@ -184,11 +188,13 @@ jobs:
       - name: Generate version.py
         env:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           DATE=$(date +%F)
           VERSION="${TAG_NAME#v}"
 
-          printf 'VERSION = "%s"\nBUILD_DATE = "%s"\n' "$VERSION" "$DATE" > src/app/config/version.py
+          printf 'VERSION = "%s"\nBUILD_DATE = "%s"\nGITHUB_URL = "https://github.com/%s"\n' \
+              "$VERSION" "$DATE" "$REPOSITORY" > src/app/config/version.py
 
       - name: Build with PyInstaller
         env:
