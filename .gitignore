@@ -24,6 +24,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+PulmoRisk.AppDir/
 
 # PyInstaller
 *.manifest
@@ -126,3 +127,5 @@ requirements.txt
 src/sybil_example/
 radiomics_example/
 src/*.csv
+icons/
+appimagetool

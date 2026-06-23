@@ -1,20 +1,95 @@
-# Tkinter Foundry
+# PulmoRisk
 
-A modern, production-ready tkinter application with uv, Docker, and CI/CD.
+A desktop application for lung cancer risk estimation, combining validated deep learning and radiomics models with clinical and epidemiological risk factors.
 
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Docker](https://img.shields.io/badge/docker-supported-blue.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Ruff](https://img.shields.io/badge/code%20style-ruff-ff69b4.svg)
+[![Latest Release](https://img.shields.io/github/v/release/hung-lab/Lung_cancer_risk_models)](https://github.com/hung-lab/Lung_cancer_risk_models/releases/latest)
+ 
+**[⬇ Download the latest release](https://github.com/hung-lab/Lung_cancer_risk_models/releases/latest)**
+
+
+---
+ 
+## About
+ 
+PulmoRisk is a clinical decision support tool for estimating lung cancer risk from low-dose CT (LDCT) scans combined with patient clinical and epidemiological data. It integrates two complementary validated machine learning models into a single desktop application:
+ 
+**Sybil-Epi** — A lung cancer risk prediction model that combines Sybil's deep learning CT analysis with 11 clinical and epidemiological factors: age, BMI, education level, ethnicity, COPD history, family lung cancer history, personal cancer history, smoking status, smoking duration, smoking intensity, and smoking quit time. The model outputs a calibrated 6-year lung cancer risk probability. No nodule annotation or segmentation is required. More information: [journal.chestnet.org](https://journal.chestnet.org/article/S0012-3692(26)00296-5/fulltext) | [GitHub](https://github.com/hung-lab/Sybil-Epi)
+ 
+**INTEGRAL-Radiomics** — A radiomic feature extraction model that quantifies imaging biomarkers from CT scans, providing a complementary malignancy risk estimate based on tumour texture, shape, and intensity patterns. Requires a CT image and nodule mask in NRRD format. [GitHub](https://github.com/hung-lab/INTEGRAL-Radiomics)
+ 
+> ⚠️ This tool is intended for research and clinical decision support only. Results should be interpreted by a qualified clinician and do not constitute a diagnosis.
+
+---
 
 ## Features
+ 
+- 🫁 **Two validated models** — Sybil-Epi (CT + clinical) and INTEGRAL-Radiomics (CT + radiomics)
+- 📋 **Single patient and batch modes** — run one patient at a time or process a CSV of patients
+- 🔄 **Automatic R setup** — INTEGRAL-Radiomics R dependencies install automatically on first launch
+- 🪵 **Live activity log** — real-time inference progress and logging panel
+- 🌗 **Light / Dark / System theme** — accessible contrast theme with full dark mode support
+- 🐍 **uv package manager** — fast and reproducible dependency management
+- 🐳 **Docker development** — containerised environment with docker-compose
+- 🚀 **GitHub Actions CI/CD** — automated testing, linting, and multi-platform releases
+- 🏗️ **MVC architecture** — clean separation of concerns
+---
 
-- 🐍 **uv package manager** - Fast and efficient dependency management
-- 🐳 **Docker development** - Containerized environment with docker-compose
-- 🎯 **Ruff integration** - Modern linter and formatter for code quality
-- 🚀 **GitHub Actions** - CI/CD, version management, and multi-platform releases
-- 🏗️ **MVC architecture** - Clean separation of concerns
-- 📝 **Conventional commits** - Automatic version bumping based on commit patterns
+## Models
+ 
+### Sybil-Epi
+ 
+| Input | Details |
+|---|---|
+| CT scan folder | DICOM files (any standard LDCT series) |
+| Age | Years |
+| BMI | kg/m² |
+| Education | 6-level scale |
+| Ethnicity | White / Black / Asian / Other |
+| COPD | Yes / No |
+| Family lung cancer history | Yes / No |
+| Personal cancer history | Yes / No |
+| Smoking status | Current / Former |
+| Smoking duration | Years |
+| Smoking intensity | Cigarettes/day |
+| Smoking quit time | Years since quitting |
+ 
+**Output:** Calibrated 6-year lung cancer risk probability (Sybil-Epi ensemble score)
+ 
+Alternatively, if you already have a Sybil 6-year risk score, you can enter it directly and skip CT inference entirely.
+ 
+### INTEGRAL-Radiomics
+ 
+| Input | Details |
+|---|---|
+| CT image | NRRD format (`.nrrd`) |
+| Nodule mask | NRRD format (`.nrrd`) |
+| Age | Years |
+| Sex | Male / Female |
+| BMI | kg/m² |
+| Family lung cancer history | Yes / No |
+| COPD / emphysema | Yes / No |
+| Former smoker | Yes / No |
+| Smoking duration | Years |
+| Cigarettes per day | Count |
+| Quit time | Years since quitting |
+ 
+**Output:** Probability of malignancy (`pred_malignant`)
+ 
+---
+ 
+## Requirements
+ 
+- Python 3.10+
+- [R](https://www.r-project.org/) (required for INTEGRAL-Radiomics; detected automatically)
+- On Linux: `python3-tk`, `libgl1`, `libglib2.0-0`
+R packages (`integralrad` and dependencies) are installed automatically on first launch via Posit Package Manager.
+ 
+---
+
 
 ## Quick Start
 
@@ -57,6 +132,48 @@ A modern, production-ready tkinter application with uv, Docker, and CI/CD.
    uv run ruff check src/ tests/
    uv run ruff format src/ tests/
    ```
+
+---
+ 
+## Batch Processing
+ 
+Both models support CSV batch input. Pass a CSV file via the batch mode tab in the UI. On completion, results are written to `<input>_scored.csv` alongside the original file.
+ 
+### Sybil-Epi batch CSV columns
+ 
+| Column | Description |
+|---|---|
+| `age` | Age in years |
+| `bmi` | Body mass index (kg/m²) |
+| `copd` | 0 or 1 |
+| `education` | 1–6 (NLST codes) |
+| `ethnicity` | 1 = White, 2 = Black, 3 = Asian, 4 = Other |
+| `family_lc_history` | 0 or 1 |
+| `personal_cancer_history` | 0 or 1 |
+| `smoking_duration` | Years |
+| `smoking_intensity` | Cigarettes/day |
+| `smoking_quit_time` | Years since quitting |
+| `smoking_status` | 0 = former, 1 = current |
+| `ct_scan_dir` | Path to DICOM folder |
+| `six_year_risk` | *(optional)* Pre-computed Sybil 6-year score |
+ 
+### INTEGRAL-Radiomics batch CSV columns
+ 
+| Column | Description |
+|---|---|
+| `image_file` | Path to CT image (NRRD) |
+| `mask_file` | Path to nodule mask (NRRD) |
+| `age` | Age in years |
+| `female` | 0 = male, 1 = female |
+| `bmi` | Body mass index (kg/m²) |
+| `fhlc` | Family lung cancer history: 0 or 1 |
+| `copdemph` | COPD / emphysema: 0 or 1 |
+| `formersmk` | Former smoker: 0 or 1 |
+| `duration` | Smoking duration (years) |
+| `cigday` | Cigarettes per day |
+| `quittime` | Years since quitting |
+ 
+---
 
 ## Project Structure
 
@@ -107,29 +224,31 @@ tkinter-app/
 └── README.md                             # This file
 ```
 
+---
+ 
 ## Architecture
+ 
+PulmoRisk follows the **MVC (Model-View-Controller)** pattern with a thread-safe event bus:
+ 
+- **Models** (`models/patient_model.py`) — Validated dataclasses for patient inputs. All range and business-rule checks run in `__post_init__` so every code path (UI, batch CSV, tests) gets the same validation.
+- **Views** (`views/`) — CustomTkinter UI components. Views emit and react to events; they never call inference directly.
+- **Controllers** (`controllers/`) — Coordinate models and views. Inference runs on background threads; results are posted back to the main thread via `EventBus`.
+- **EventBus** (`utils/event_bus.py`) — A thread-safe queue polled by Tkinter's `after` loop at ~60 fps. All cross-thread communication goes through typed `AppEvent` objects.
+---
 
-This template follows the **MVC (Model-View-Controller)** pattern:
 
-- **Models** (`src/app/models.py`): Data structures and business logic
-- **Views** (`src/app/views/`): UI components and user interface
-- **Controllers** (`src/app/controllers/`): Handle user input and coordinate models and views
+## CI/CD
+ 
+### Automatic Versioning
+ 
+Commits follow the [Conventional Commits](https://www.conventionalcommits.org/) spec. [Release Please](https://github.com/googleapis/release-please) automatically generates changelogs and bumps versions:
+ 
+| Commit prefix | Version bump |
+|---|---|
+| `feat:` | Minor |
+| `fix:` | Patch |
+| `feat!:` / `BREAKING CHANGE` | Major |
 
-## CI/CD Features
-
-### Automatic Version Bumping
-
-The template uses **conventional commits** for automatic version management:
-
-```
-feat: add new feature
-fix: fix a bug
-docs: update documentation
-style: format code
-refactor: refactor code
-test: add tests
-chore: maintenance tasks
-```
 
 Examples:
 - `feat: add user authentication` → Bumps minor version
@@ -139,36 +258,46 @@ Examples:
 Conventional commits [cheatsheet](https://gist.github.com/qoomon/5dfcdf8eec66a051ecd85625518cfd13)
 
 ### Multi-Platform Releases
+ 
+On every merged release PR, GitHub Actions builds and uploads:
+ 
+- **Linux** — `.AppImage` (portable) and `.deb` package
+- **Windows** — `.zip` containing the PyInstaller one-dir bundle
+- **macOS** — `.dmg` disk image (Apple Silicon)
+---
 
-When you create a release on GitHub, the workflow automatically builds and packages your application for:
-- **Windows** - Executable with installer
-- **macOS** - App bundle
-- **Linux** - Appimage and deb package
+ 
+## Development
+ 
+### Running Tests
+ 
+```bash
+uv run pytest
+```
+ 
+### Linting
+ 
+```bash
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
+```
+ 
+### Security Scan
+ 
+```bash
+uv run bandit -r src/
+```
+ 
+### Building for Linux
+ 
+```bash
+VERSION=1.0.0 ./scripts/build_linux.sh both
+```
+ 
+Produces `dist/PulmoRisk-<version>-x86_64.AppImage` and `dist/pulmorisk_<version>_amd64.deb`.
+ 
+---
 
-### CI Pipeline
-
-The CI pipeline runs on every push and pull request:
-- Test across Python 3.10
-- Run security scans with Bandit
-- Lint code with Ruff
-- Check for potential issues
-
-## Docker Development
-
-### Services
-
-- **app**: Main application container
-- **shell**: Development shell for running commands
-
-### Environment Variables
-
-- `DISPLAY`: X11 display for GUI applications
-- `XAUTHORITY`: X11 authority file
-
-### Volume Mounts
-
-- `./src:/app/src` - Live code reloading
-- `./scripts:/app/scripts` - Build scripts
 
 ## Configuration
 
@@ -240,23 +369,25 @@ Tests include coverage reporting:
 
 ## Troubleshooting
 
-### Docker Issues
+**R not detected on startup** — Install R from [rig](https://github.com/r-lib/rig) and ensure `Rscript` is on your PATH. PulmoRisk searches common install locations automatically (Homebrew, CRAN, rig on macOS; apt on Linux; Program Files on Windows).
+ 
+**INTEGRAL-Radiomics install fails** — Check the Activity Log panel for the exact error. Common causes are missing system libraries (`libssl-dev`, `libcurl4-openssl-dev`) on Linux. The INTEGRAL tab will be unavailable but Sybil-Epi will still work.
+ 
+**GUI does not appear on Linux** — Ensure `DISPLAY` is set and the X11 server is running. For Docker: `xhost +local:docker` before starting the container.
+ 
+**Blank CT inference result** — Confirm the CT folder contains valid DICOM files and is not empty.
+ 
+---
 
-- If GUI doesn't display, ensure `DISPLAY` and `XAUTHORITY` are set
-- Try running `xhost +local:docker` to allow container access to X11
-- Check that your system has X11 forwarding enabled
+## Contributing
+ 
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Follow conventional commits
+4. Run tests and linting: `uv run pytest && uv run ruff check src/`
+5. Open a pull request
+---
 
-### Python Environment Issues
-
-- Use `uv sync --all-extras` to install all dependencies
-- Run `uv sync --upgrade` to update dependencies
-- Check Python version compatibility (3.9+ required)
-
-### GUI Issues
-
-- Ensure tkinter is installed (`apt-get install tk` on Linux)
-- Check system dependencies for GUI applications
-- Verify display server is running
 
 ## License
 
@@ -264,6 +395,8 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Acknowledgments
 
+- [Sybil](https://github.com/reginabarzilaygroup/Sybil) — MIT, Regina Barzilay Group, MIT CSAIL
+- [INTEGRAL-Radiomics](https://github.com/hung-lab/INTEGRAL-Radiomics) — Hung Lab
 - [uv](https://docs.astral.sh/uv/) - Fast Python package management
 - [Docker](https://www.docker.com/) - Containerization platform
 - [Ruff](https://github.com/astral-sh/ruff) - Extremely fast Python linter
