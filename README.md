@@ -298,74 +298,24 @@ Produces `dist/PulmoRisk-<version>-x86_64.AppImage` and `dist/pulmorisk_<version
  
 ---
 
+## Contributing
+ 
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Follow conventional commits
+4. Run tests and linting: `uv run pytest && uv run ruff check src/`
+5. Open a pull request
+---
 
-## Configuration
-
-### pyproject.toml
-
-Main project configuration including:
-- Dependencies and optional dev dependencies
-- Project metadata
-- Entry points
-- Tool configurations (Ruff, pytest)
-
-### Ruff Configuration
-
-Ruff is configured with:
-- Line length: 88 characters
-- Target Python version: 3.9+
-- Selected rules: E, W, F, I, B, C4, UP
-- Ignored rules: E501 (line too long), B008 (function calls in defaults)
-
-## Building and Distribution
-
-### Local Build
-
-```bash
-./build_linux.sh both
-```
-
-This creates a standalone executable in the `dist/` directory.
-
-### Creating a Release
+## Creating a Release
 
 1. Make sure you have conventional commits
 2. When you push commits release please action will automatically create a release PR
 3. when you are ready merge the Release PR
 4. release-please pushes a v* tag
 5. The workflow will automatically build for all platforms
+---
 
-## Testing
-
-### Running Tests
-
-```bash
-uv run pytest
-```
-
-### Test Coverage
-
-Tests include coverage reporting:
-- Terminal output with missing lines
-- HTML report in `htmlcov/` directory
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Follow conventional commits
-4. Run tests and linting (`uv run pytest && uv run ruff check`)
-5. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Development Guidelines
-
-- Use existing code structure and patterns
-- Write tests for new features
-- Update documentation as needed
-- Follow Ruff linting rules
-- Use conventional commit messages
 
 ## Troubleshooting
 
@@ -377,15 +327,6 @@ Tests include coverage reporting:
  
 **Blank CT inference result** — Confirm the CT folder contains valid DICOM files and is not empty.
  
----
-
-## Contributing
- 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Follow conventional commits
-4. Run tests and linting: `uv run pytest && uv run ruff check src/`
-5. Open a pull request
 ---
 
 
