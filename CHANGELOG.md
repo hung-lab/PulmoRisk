@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.9](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.8...v1.4.9) (2026-06-25)
+
+
+### Bug Fixes
+
+* had wrong variable name in github url release ([50c676b](https://github.com/hung-lab/Lung_cancer_risk_models/commit/50c676b8e1bc7bd130940b90ef61cec432568d5c))
+
 ## [1.4.8](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.7...v1.4.8) (2026-06-22)
 
 
