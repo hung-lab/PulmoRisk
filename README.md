@@ -319,6 +319,12 @@ Produces `dist/PulmoRisk-<version>-x86_64.AppImage` and `dist/pulmorisk_<version
 
 ## Troubleshooting
 
+**macOS blocks the application because it is from an unidentified developer** — macOS Gatekeeper may prevent PulmoRisk from opening if the application is not notarized. To allow it:
+1. Open **System Settings → Privacy & Security**.
+2. Scroll to the **Security** section.
+3. Click **Open Anyway** next to the PulmoRisk warning.
+4. Confirm by clicking **Open**.
+
 **R not detected on startup** — Install R from [rig](https://github.com/r-lib/rig) and ensure `Rscript` is on your PATH. PulmoRisk searches common install locations automatically (Homebrew, CRAN, rig on macOS; apt on Linux; Program Files on Windows).
  
 **INTEGRAL-Radiomics install fails** — Check the Activity Log panel for the exact error. Common causes are missing system libraries (`libssl-dev`, `libcurl4-openssl-dev`) on Linux. The INTEGRAL tab will be unavailable but Sybil-Epi will still work.

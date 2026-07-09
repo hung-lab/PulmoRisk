@@ -60,4 +60,4 @@ ENV TMPDIR=/tmp
 ENV R_LIBS_USER=/home/appuser/R/library
 ENV R_LIBS=/home/appuser/R/library
 
-#ENTRYPOINT ["uv", "run", "tkinter-app"]
+ENTRYPOINT ["uv", "run", "pulmorisk"]

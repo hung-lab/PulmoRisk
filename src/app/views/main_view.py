@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from app.config.settings import ERROR_COLOUR
+from app.config.settings import (
+    ERROR_COLOUR,
+    ERROR_COLOUR_HOVER,
+    PRIMARY_DARK,
+    WARNING_COLOUR,
+)
 from app.utils.helpers import open_url
 from app.utils.ui_config import CARD_PAD_X, CARD_PAD_Y, SPACE_MD, SPACE_XS
 
@@ -51,6 +56,7 @@ class MainWindow:
         )
         content.grid_rowconfigure(0, weight=1)
         content.grid_rowconfigure(1, weight=0)
+        content.grid_rowconfigure(2, weight=0)
         content.grid_columnconfigure(0, weight=1)
 
         # ── intro textbox ─────────────────────────────────────────────────────
@@ -76,6 +82,14 @@ class MainWindow:
             )
             text._textbox.tag_bind(
                 tag, "<Leave>", lambda _: text._textbox.configure(cursor="")
+            )
+
+        def copy_citation():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(citation)
+            copy_button.configure(text="✓ Copied!")
+            self.root.after(
+                2000, lambda: copy_button.configure(text="📋 Copy Citation")
             )
 
         text.insert(
@@ -115,19 +129,62 @@ class MainWindow:
         text.insert("end", "INTEGRAL-Radiomics\n", "heading")
         text.insert(
             "end",
-            "Applies radiomic feature extraction to quantify imaging biomarkers "
-            "from CT scans, providing a complementary risk estimate based on "
-            "tumour texture, shape, and intensity patterns. ",
+            "INTEGRAL-Radiomics is a machine-learning model that estimates pulmonary nodule malignancy "
+            "risk based on a set of radiomic and epidemiological features. "
+            "The high-dimensional radiomic features are automatically calculated using PyRadiomics "
+            "based on the user-provided image (LDCT) and nodule mask. "
+            "The user must also provide a set of epidemiological features including: age, sex, body mass index (BMI), "
+            "family history of lung cancer, personal history of COPD/emphysema, smoking status, smoking duration, "
+            "smoking intensity, and smoking quit time."
+            "More information on INTEGRAL-Radiomics can be a found at ",
         )
-        _add_link("View on GitHub", "https://github.com/hung-lab/INTEGRAL-Radiomics")
-        text.insert("end", "\n\n\n\n")
+        _add_link(
+            "https://thorax.bmj.com/content/79/4/307.long.",
+            "https://thorax.bmj.com/content/79/4/307.long",
+        )
+        text.insert("end", "\n\n")
+        text.insert(
+            "end",
+            "If you have questions about the INTEGRAL-Radiomics model, please file an issue on GitHub ",
+        )
+        _add_link(
+            "(https://github.com/mattwarkentin/INTEGRAL-Radiomics)",
+            "https://github.com/mattwarkentin/INTEGRAL-Radiomics",
+        )
+        text.insert("end", "\n\n")
 
         text.insert(
             "end",
-            "Select a model from the tabs above to begin. Ensure you have valid CT "
-            "scans before running either model. DICOM files for Sybil-Epi and NRRD image and nodule mask for INTEGRAL-Radiomics",
-            "subheading",
+            "If you use this model in your work, please cite:\n\n",
         )
+        citation = (
+            "Warkentin MT, Al-Sawaihey H, Lam S, Liu G, Diergaarde B, Yuan JM, "
+            "Wilson DO, Atkar-Khattra S, Grant B, Brhane Y, Khodayari-Moez E, "
+            "Murison KR, Tammemägi MC, Campbell KR, Hung RJ. "
+            "Radiomics analysis to predict pulmonary nodule malignancy using "
+            "machine learning approaches. Thorax. 2024 Apr 1;79(4):307-15.\n\n"
+        )
+
+        text.insert(
+            "end",
+            citation,
+        )
+
+        copy_button = ctk.CTkButton(
+            text._textbox,
+            text="📋 Copy Citation",
+            command=copy_citation,
+            width=110,
+            height=24,
+            font=ctk.CTkFont(size=11),
+            fg_color=ERROR_COLOUR,
+            hover_color=ERROR_COLOUR_HOVER,
+        )
+
+        text._textbox.window_create("end", window=copy_button)
+        text.insert("end", "\n\n")
+
+        text.insert("end", "\n\n\n\n")
 
         # style the heading tag
         text._textbox.tag_config(
@@ -146,6 +203,47 @@ class MainWindow:
 
         text.configure(state="disabled")
 
+        # ── banner ────────────────────────────────────────────────────────
+        instruction_banner = ctk.CTkFrame(
+            content,
+            fg_color=PRIMARY_DARK,
+            corner_radius=8,
+            border_width=1,
+            border_color=WARNING_COLOUR,
+        )
+
+        instruction_banner.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=SPACE_MD,
+            pady=(SPACE_XS, SPACE_XS),
+        )
+
+        instruction_banner.grid_columnconfigure(0, weight=1)
+
+        instruction_label = ctk.CTkLabel(
+            instruction_banner,
+            text=(
+                "⚠  Select a model from the tabs above to begin.\n"
+                "Ensure you have valid CT scans before running either model. "
+                "Sybil-Epi requires DICOM files; INTEGRAL-Radiomics requires "
+                "an NRRD image and nodule mask."
+            ),
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=WARNING_COLOUR,
+            justify="left",
+            anchor="w",
+            wraplength=800,
+        )
+
+        instruction_label.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=12,
+            pady=10,
+        )
         # ── disclaimer ────────────────────────────────────────────────────────
         disclaimer_label = ctk.CTkLabel(
             content,
@@ -157,7 +255,7 @@ class MainWindow:
             font=ctk.CTkFont(size=12),
         )
         disclaimer_label.grid(
-            row=1, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_XS, SPACE_MD)
+            row=2, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_XS, SPACE_MD)
         )
 
         def _update_disclaimer_wrap(event):
