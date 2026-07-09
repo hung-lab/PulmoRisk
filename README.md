@@ -12,6 +12,25 @@ A desktop application for lung cancer risk estimation, combining validated deep 
 
 ---
 
+## Table of Contents
+
+- [About](#about)
+- [Features](#features)
+- [Models](#models)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Batch Processing](#batch-processing)
+- [Architecture](#architecture)
+- [CI/CD](#cicd)
+- [Development](#development)
+- [Contributing](#contributing)
+- [Creating a Release](#creating-a-release)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+---
+
 ## About
 
 PulmoRisk is a clinical decision support tool for estimating lung cancer risk from low-dose CT (LDCT) scans combined with patient clinical and epidemiological data. It integrates two complementary validated machine learning models into a single desktop application:
@@ -326,19 +345,51 @@ Produces `dist/PulmoRisk-<version>-x86_64.AppImage` and `dist/pulmorisk_<version
 
 ## Troubleshooting
 
-**macOS blocks the application because it is from an unidentified developer** — macOS Gatekeeper may prevent PulmoRisk from opening if the application is not notarized.
-![Screenshot of the app](screenshots/step1.png)
+## macOS Security Warning
 
-To allow it:
+macOS may block PulmoRisk from opening because it comes from an **unidentified developer**. This happens when the application has not been notarized through Apple's verification process.
 
-1. Open **System Settings → Privacy & Security**.
-2. Scroll to the **Security** section.
-![Screenshot of the app](screenshots/step2.png)
-3. Click **Open Anyway** next to the PulmoRisk warning.
-4. Confirm again by clicking **Open Anyway**.
-![Screenshot of the app](screenshots/step3.png)
-5. Final confirmation **Use Password**.
-![Screenshot of the app](screenshots/step4.png)
+Follow these steps to allow PulmoRisk to run:
+
+### 1. Open Privacy & Security settings
+
+Go to:
+
+**System Settings → Privacy & Security**
+
+Scroll down to the **Security** section.
+
+![macOS Privacy & Security settings showing PulmoRisk blocked](screenshots/step1.png)
+
+---
+
+### 2. Allow the application
+
+Find the PulmoRisk warning message and click:
+
+**Open Anyway**
+
+![Open Anyway button in macOS Security settings](screenshots/step2.png)
+
+---
+
+### 3. Confirm opening PulmoRisk
+
+Click **Open Anyway** again when macOS asks for confirmation.
+
+![macOS confirmation dialog for opening PulmoRisk](screenshots/step3.png)
+
+---
+
+### 4. Authenticate
+
+Enter your password or use Touch ID to complete the installation.
+
+![macOS authentication prompt](screenshots/step4.png)
+
+---
+
+PulmoRisk should now open normally.
 
 **R not detected on startup** — Install R from [rig](https://github.com/r-lib/rig) and ensure `Rscript` is on your PATH. PulmoRisk searches common install locations automatically (Homebrew, CRAN, rig on macOS; apt on Linux; Program Files on Windows).
 
