@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.10](https://github.com/hung-lab/PulmoRisk/compare/v1.4.9...v1.4.10) (2026-07-09)
+
+
+### Bug Fixes
+
+* update info text for INTEGRAL-Radiomics ([6b52f0d](https://github.com/hung-lab/PulmoRisk/commit/6b52f0d11de45a869ed4f0312959701214c0ba45))
+
 ## [1.4.9](https://github.com/hung-lab/Lung_cancer_risk_models/compare/v1.4.8...v1.4.9) (2026-06-25)
 
 
