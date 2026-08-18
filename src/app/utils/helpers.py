@@ -274,3 +274,18 @@ def find_integral_cli() -> str | None:
 def format_percent(value: float, decimals: int = 3) -> str:
     percent = f"{value * 100:.{decimals}f}"
     return f"{percent.rstrip('0').rstrip('.')}%"
+
+def validate_rscript(path: Path) -> bool:
+    if not path.is_file():
+        return False
+
+    try:
+        result = subprocess.run(
+            [str(path), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False

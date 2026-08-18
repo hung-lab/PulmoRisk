@@ -6,8 +6,8 @@ Usage (in main.py)
     splash = SplashScreen(root, bus)        # show splash
     root.after(100, sybil_ctrl.load_model)  # start loading
     root.mainloop()
-    # SplashScreen subscribes to "model_ready" and calls root.deiconify()
-    # automatically when the model finishes loading.
+    # SplashScreen subscribes to startup events and calls root.deiconify()
+    # when both Sybil and Integral initialization have reached a terminal state.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
-from app.config.settings import ERROR_COLOUR, SUCCESS_COLOUR
+from app.config.settings import ERROR_COLOUR, ERROR_COLOUR_HOVER, SUCCESS_COLOUR
 from app.utils.helpers import center_window
 from app.utils.ui_config import SPACE_SM, SPACE_XL, SPACE_XS
 
@@ -25,16 +25,19 @@ if TYPE_CHECKING:
 
 
 class SplashScreen:
-    """Centered toplevel splash that blocks until the model is ready.
+    """Centered startup splash shown until application initialization completes.
 
-    Subscribes to the EventBus and reacts to two event types:
-      - ``log``        → updates the status line
-      - ``model_ready``→ closes the splash and reveals the main window
-      - ``model_error``→ shows an error message with a Quit button
+    The splash waits for both the Sybil model and INTEGRAL-Radiomics setup.
+    If the Integral setup cannot be completed, the user can continue with
+    that feature unavailable.
     """
 
     _WIDTH = 600
     _HEIGHT = 400
+
+    @property
+    def window(self) -> ctk.CTkToplevel:
+        return self._win
 
     def __init__(self, root: ctk.CTk, bus: EventBus) -> None:
         self._root = root
@@ -52,6 +55,8 @@ class SplashScreen:
         self._win.resizable(False, False)
         self._win.protocol("WM_DELETE_WINDOW", lambda: None)  # prevent manual close
 
+        self._continue_button: ctk.CTkButton | None = None
+
         self._build()
 
         # Size to content and centre on screen.
@@ -60,7 +65,6 @@ class SplashScreen:
         # Keep on top of the (hidden) root
         self._win.lift()
         self._win.focus_force()
-        self._win.grab_set()
 
         bus.subscribe(self._handle_event)
         self._tick()
@@ -118,7 +122,7 @@ class SplashScreen:
         )
         self._elapsed_label.pack(pady=(SPACE_SM, 0))
 
-        ctk.CTkLabel(
+        self._first_run_label = ctk.CTkLabel(
             inner,
             text=(
                 "First run: model weights are downloaded to ~/.sybil/ and R "
@@ -128,7 +132,8 @@ class SplashScreen:
             text_color="gray50",
             justify="center",
             wraplength=400,
-        ).pack(pady=(SPACE_SM, 0))
+        )
+        self._first_run_label.pack(pady=(SPACE_SM, 0))
 
     # ── elapsed timer ──────────────────────────────────────────────────
 
@@ -206,16 +211,27 @@ class SplashScreen:
             self._close_and_show()
 
     def _show_continue(self) -> None:
+        if self._closed:
+            return
+
         self._bar.stop()
         self._bar.configure(mode="determinate")
         self._bar.set(1.0)
 
-        ctk.CTkButton(
+        if self._continue_button is not None:
+            return
+
+        self._continue_button = ctk.CTkButton(
             self._win,
             text="Continue",
             width=120,
             command=self._close_and_show,
-        ).place(relx=0.5, rely=0.88, anchor="center")
+        )
+        self._continue_button.place(
+            relx=0.5,
+            rely=0.88,
+            anchor="center",
+        )
 
     def _close_and_show(self) -> None:
         self._closed = True
@@ -240,3 +256,117 @@ class SplashScreen:
             width=100,
             command=self._root.quit,
         ).place(relx=0.5, rely=0.88, anchor="center")
+
+    def show_r_setup(self) -> None:
+        """Return the splash to the normal startup state while R setup runs."""
+
+        # Remove the R-selection controls.
+        self.hide_r_missing()
+
+        # Restore normal startup information.
+        self._elapsed_label.pack(pady=(SPACE_SM, 0))
+        self._first_run_label.pack(pady=(SPACE_SM, 0))
+
+        # Restore the progress bar.
+        self._bar.configure(mode="indeterminate")
+        self._bar.start()
+
+        self._integral_status.configure(
+            text="⏳ Setting up INTEGRAL-Radiomics…",
+            text_color="gray60",
+        )
+
+    def show_r_missing(self, on_browse, on_cancel):
+        """Show the R selection UI inside the startup splash."""
+
+        self._bar.stop()
+        self._bar.configure(mode="determinate")
+        self._bar.set(0)
+
+        self._elapsed_label.pack_forget()
+        self._first_run_label.pack_forget()
+
+        self._integral_status.configure(
+            text="✗ R was not found",
+            text_color=ERROR_COLOUR,
+        )
+
+        self._r_message = ctk.CTkLabel(
+            self._win,
+            text=(
+                "INTEGRAL-Radiomics requires R.\n\n"
+                "Rscript could not be found in the standard "
+                "installation locations.\n\n"
+                "If R is already installed, locate Rscript manually."
+            ),
+            justify="center",
+            wraplength=450,
+        )
+        self._r_message.place(
+            relx=0.5,
+            rely=0.60,
+            anchor="center",
+        )
+
+        self._r_error_label = ctk.CTkLabel(
+            self._win,
+            text="",
+            text_color=ERROR_COLOUR,
+        )
+        self._r_error_label.place(
+            relx=0.5,
+            rely=0.70,
+            anchor="center",
+        )
+
+        self._r_browse_button = ctk.CTkButton(
+            self._win,
+            text="Locate Rscript",
+            width=180,
+            command=on_browse,
+        )
+        self._r_browse_button.place(
+            relx=0.5,
+            rely=0.78,
+            anchor="center",
+        )
+
+        self._r_cancel_button = ctk.CTkButton(
+            self._win,
+            text="Continue Without R",
+            width=180,
+            fg_color=ERROR_COLOUR,
+            hover_color=ERROR_COLOUR_HOVER,
+            border_width=1,
+            command=on_cancel,
+        )
+        self._r_cancel_button.place(
+            relx=0.5,
+            rely=0.88,
+            anchor="center",
+        )
+
+    def hide_r_missing(self) -> None:
+        for widget_name in (
+            "_r_message",
+            "_r_error_label",
+            "_r_browse_button",
+            "_r_cancel_button",
+        ):
+            widget = getattr(self, widget_name, None)
+
+            if widget is not None:
+                widget.destroy()
+                setattr(self, widget_name, None)
+
+    def show_r_error(self, message: str) -> None:
+        self._r_error_label.configure(
+            text=message,
+            text_color=ERROR_COLOUR,
+        )
+
+    def continue_without_r(self) -> None:
+        """Close the splash and continue without INTEGRAL-Radiomics."""
+        self._integral_done = True
+        self._integral_error = True
+        self._close_and_show()

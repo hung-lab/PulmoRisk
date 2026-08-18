@@ -50,7 +50,7 @@ ETHNICITY_OPTIONS: dict[str, int] = {
     "White": 1,
     "Black": 2,
     "Asian": 3,
-    "Others": 4,
+    "Other": 4,
 }
 
 # Overlay stage labels keyed by the log messages the controller emits.
@@ -206,22 +206,8 @@ class SybilView:
         ctk.CTkLabel(
             batch_card,
             text=(
-                "Upload a CSV containing individual metadata and CT scan folder paths.\n\n"
-                "Required columns:\n"
-                "- age\n"
-                "- bmi\n"
-                "- copd\n"
-                "- education\n"
-                "- ethnicity\n"
-                "- family_lc_history\n"
-                "- personal_cancer_history\n"
-                "- smoking_duration\n"
-                "- smoking_intensity\n"
-                "- smoking_quit_time\n"
-                "- smoking_status\n"
-                "- ct_scan_dir\n\n"
-                "Optional:\n"
-                "- six_year_risk"
+                "Upload a CSV containing individual metadata and CT scan folder paths.\n"
+                "The CSV must contain the required Sybil-Epi input columns."
             ),
             justify="left",
             anchor="w",
@@ -230,6 +216,7 @@ class SybilView:
         self.batch_select_button = ctk.CTkButton(
             batch_card,
             text="Select CSV File",
+            height=40,
             command=self._on_batch_submit,
             fg_color=WARNING_COLOUR,
             hover_color=WARNING_COLOUR_HOVER,
@@ -237,8 +224,137 @@ class SybilView:
         self.batch_select_button.pack(
             anchor="w",
             padx=SECTION_GAP_BOTTOM,
+            pady=(0, SPACE_LG),
+        )
+
+        # ── Example CSV ────────────────────────────────────────────────────────
+
+        ctk.CTkLabel(
+            batch_card,
+            text="Example CSV",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(
+            anchor="w",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(SPACE_SM, SPACE_XS),
+        )
+
+        csv_example = (
+            "age,bmi,copd,education,ethnicity,family_lc_history,"
+            "personal_cancer_history,smoking_duration,smoking_intensity,"
+            "smoking_quit_time,smoking_status,ct_scan_dir,six_year_risk\n"
+            "65,27.4,0,5,1,1,0,30,20,5,0,/data/patient_001,\n"
+            "58,31.2,1,4,2,0,0,35,15,0,1,/data/patient_002,\n"
+            "72,25.8,0,6,1,1,1,40,25,2,0,/data/patient_003,"
+        )
+
+        example_box = ctk.CTkTextbox(
+            batch_card,
+            height=100,
+            font=ctk.CTkFont(family="Courier", size=11),
+        )
+
+        example_box.pack(
+            fill="x",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(0, SPACE_SM),
+        )
+
+        example_box.insert("1.0", csv_example)
+        example_box.configure(state="disabled")
+
+        ctk.CTkLabel(
+            batch_card,
+            text=(
+                "Education: 1-6  •  Ethnicity: 1-4  •  "
+                "Yes/No fields: 0 = No, 1 = Yes"
+            ),
+            text_color=("gray40", "gray70"),
+            justify="left",
+        ).pack(
+            anchor="w",
+            padx=SECTION_GAP_BOTTOM,
             pady=(0, SPACE_MD),
         )
+
+        # ── Value mappings ─────────────────────────────────────────────────────
+
+        mapping_frame = ctk.CTkFrame(
+            batch_card,
+            fg_color="transparent",
+            border_width=0,
+        )
+        mapping_frame.pack(
+            fill="x",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(SPACE_SM, SPACE_MD),
+        )
+
+        mapping_frame.grid_columnconfigure(0, weight=1)
+        mapping_frame.grid_columnconfigure(1, weight=1)
+
+        # Education
+        education_frame = ctk.CTkFrame(
+            mapping_frame,
+            fg_color="transparent",
+            border_width=0,
+        )
+        education_frame.grid(
+            row=0,
+            column=0,
+            sticky="nw",
+            padx=(0, SPACE_MD),
+        )
+
+        ctk.CTkLabel(
+            education_frame,
+            text="Education",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", pady=(0, SPACE_XS))
+
+        ctk.CTkLabel(
+            education_frame,
+            text=(
+                "1 = Less than high school graduate\n"
+                "2 = High school graduate\n"
+                "3 = Some training after high school\n"
+                "4 = Some college\n"
+                "5 = College graduate\n"
+                "6 = Postgraduate / professional degree"
+            ),
+            justify="left",
+            anchor="w",
+        ).pack(anchor="w")
+
+        # Ethnicity
+        ethnicity_frame = ctk.CTkFrame(
+            mapping_frame,
+            fg_color="transparent",
+            border_width=0,
+        )
+        ethnicity_frame.grid(
+            row=0,
+            column=1,
+            sticky="nw",
+        )
+
+        ctk.CTkLabel(
+            ethnicity_frame,
+            text="Ethnicity",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", pady=(0, SPACE_XS))
+
+        ctk.CTkLabel(
+            ethnicity_frame,
+            text=(
+                "1 = White\n"
+                "2 = Black\n"
+                "3 = Asian\n"
+                "4 = Other"
+            ),
+            justify="left",
+            anchor="w",
+        ).pack(anchor="w")
 
         # hidden initially
         self._batch_frame.pack_forget()

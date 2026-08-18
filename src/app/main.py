@@ -1,7 +1,6 @@
 """Application entry point."""
 
 import platform
-import threading
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -95,29 +94,24 @@ def main() -> None:
     integral_form = IntegralView(split.integral_tab, integral_ctrl)
     bus.subscribe(integral_form.handle_event)
 
+    # ── Splash screen — shown before the main window, closes on model_ready
+    # Must be created AFTER all bus subscribers are registered so splash
+    # also sees all log events during model loading.
+    splash = SplashScreen(root, bus)
+
     # ── Controllers ───────────────────────────────────────────────────────
-    app_ctrl = AppController(root, bus, split, sybil_form, integral_form)
+    app_ctrl = AppController(root, bus, split, sybil_form, integral_form, splash)
 
     menubar_ctrl = MenuBarController(root, bus, app_ctrl)
     menu = MenuBar(root, menubar_ctrl)
     menubar_ctrl.set_menu_bar(menu)
-
-    # ── Splash screen — shown before the main window, closes on model_ready
-    # Must be created AFTER all bus subscribers are registered so splash
-    # also sees all log events during model loading.
-    SplashScreen(root, bus)
 
     # ── Load model AFTER all subscribers are registered ────────────────────
     # root.after ensures the mainloop is running and the UI is fully rendered
     # before the background thread starts emitting log events.
     root.after(100, sybil_ctrl.load_model)
 
-    root.after(
-        100,
-        lambda: threading.Thread(
-            target=app_ctrl.check_and_install_integral, daemon=True
-        ).start(),
-    )
+    root.after(100, app_ctrl.start_integral_setup)
 
     def on_close():
         root.destroy()

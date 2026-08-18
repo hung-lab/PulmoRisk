@@ -1,15 +1,23 @@
 import os
 import platform
 import subprocess  # nosec B404
+import sys
 import tempfile
+import threading
 from pathlib import Path
+from tkinter import filedialog
 
 import certifi
 import customtkinter as ctk
 
 from app.controllers.base_controller import BaseController
 from app.utils.event_bus import AppEvent, EventBus
-from app.utils.helpers import find_integral_cli, find_rscript, r_package_installed
+from app.utils.helpers import (
+    find_integral_cli,
+    find_rscript,
+    r_package_installed,
+    validate_rscript,
+)
 
 os.environ["CURL_CA_BUNDLE"] = certifi.where()
 
@@ -17,11 +25,12 @@ os.environ["CURL_CA_BUNDLE"] = certifi.where()
 class AppController(BaseController):
     """Handles top-level UI events: layout toggles, theme, lifecycle."""
 
-    def __init__(self, root, bus: EventBus, split_view, sybil_form, integral_form):
+    def __init__(self, root, bus: EventBus, split_view, sybil_form, integral_form, splash):
         super().__init__(root, bus)
         self._split = split_view
         self._form_sybil = sybil_form
         self._form_integral = integral_form
+        self._splash = splash
         bus.subscribe(self._handle_event)
 
     def _handle_event(self, event: AppEvent):
@@ -104,7 +113,78 @@ class AppController(BaseController):
         self._log(f"Using fallback CRAN repo: {ppm_url}", data=CH)
         return ppm_url
 
-    def check_and_install_integral(self):
+    def start_integral_setup(self):
+        """Find R and start the integral setup."""
+        CH = {"channel": "integral"}
+        rscript_path = find_rscript()
+
+        if rscript_path:
+            self._log(
+                f"Using Rscript at: {rscript_path}",
+                data=CH,
+            )
+            self._start_integral_setup(rscript_path)
+            return
+
+        self._log(
+            "Rscript was not found in the standard locations.",
+            level="WARNING",
+            data=CH,
+        )
+
+        self._splash.show_r_missing(
+            on_browse=self._browse_for_rscript,
+            on_cancel=self._rscript_cancelled,
+        )
+
+    def _browse_for_rscript(self):
+        expected = "Rscript.exe" if sys.platform == "win32" else "Rscript"
+
+        path = filedialog.askopenfilename(
+            parent=self._splash.window,
+            title=f"Locate {expected}",
+            filetypes=[
+                ("Rscript executable", expected),
+                ("All files", "*"),
+            ],
+        )
+
+        if not path:
+            return
+
+        candidate = Path(path)
+
+        if not validate_rscript(candidate):
+            self._splash.show_r_error(
+                f"{expected} was found, but it could not be executed."
+            )
+            return
+
+        self._splash.show_r_setup()
+        self._start_integral_setup(str(candidate))
+
+    def _start_integral_setup(self, rscript_path: str):
+        """Start R dependency setup using the supplied Rscript."""
+        threading.Thread(
+            target=self.check_and_install_integral,
+            args=(rscript_path,),
+            daemon=True,
+        ).start()
+
+    def _rscript_cancelled(self):
+        CH = {"channel": "integral"}
+        self._log(
+            "R installation setup cancelled by user.",
+            level="ERROR",
+            data=CH,
+        )
+        self._emit(AppEvent(type="ui_state", message="R_missing"))
+        self._emit(
+            AppEvent(type="integral_status", message="R_missing")
+        )
+        self._splash.continue_without_r()
+
+    def check_and_install_integral(self, rscript_path: str):
         """Check / install integralrad safely on app launch.
 
         Uses Posit Package Manager (PPM) to fetch pre-compiled Linux binaries
@@ -117,7 +197,7 @@ class AppController(BaseController):
             self._log("Checking R dependencies", data=CH)
 
             # ── 1. Rscript ────────────────────────────────────────────────
-            rscript_path = find_rscript()
+            #rscript_path = find_rscript()
             if not rscript_path:
                 self._log(
                     "R is not installed or Rscript could not be found",
