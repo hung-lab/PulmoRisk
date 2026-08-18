@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.11](https://github.com/hung-lab/PulmoRisk/compare/v1.4.10...v1.4.11) (2026-08-18)
+
+
+### Bug Fixes
+
+* issue related to finding R added a way for user to specify rscript path ([0e0b07a](https://github.com/hung-lab/PulmoRisk/commit/0e0b07ab6056204f2a9437608c39fb6026b9ecc0))
+
 ## [1.4.10](https://github.com/hung-lab/PulmoRisk/compare/v1.4.9...v1.4.10) (2026-07-09)
 
 
