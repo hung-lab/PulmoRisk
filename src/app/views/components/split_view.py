@@ -39,7 +39,8 @@ class SplitView:
         self.log_panel.grid(row=0, column=1, sticky="nsew", padx=(SPACE_XS, 0), pady=0)
         self.log_panel.grid_propagate(False)
 
-        self._log_visible = True
+        self._log_visible = False
+        self.log_panel.grid_remove()
 
     # ── log panel toggle ──────────────────────────────────────────────────
 

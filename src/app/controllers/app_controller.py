@@ -25,7 +25,9 @@ os.environ["CURL_CA_BUNDLE"] = certifi.where()
 class AppController(BaseController):
     """Handles top-level UI events: layout toggles, theme, lifecycle."""
 
-    def __init__(self, root, bus: EventBus, split_view, sybil_form, integral_form, splash):
+    def __init__(
+        self, root, bus: EventBus, split_view, sybil_form, integral_form, splash
+    ):
         super().__init__(root, bus)
         self._split = split_view
         self._form_sybil = sybil_form
@@ -179,9 +181,7 @@ class AppController(BaseController):
             data=CH,
         )
         self._emit(AppEvent(type="ui_state", message="R_missing"))
-        self._emit(
-            AppEvent(type="integral_status", message="R_missing")
-        )
+        self._emit(AppEvent(type="integral_status", message="R_missing"))
         self._splash.continue_without_r()
 
     def check_and_install_integral(self, rscript_path: str):
@@ -197,7 +197,7 @@ class AppController(BaseController):
             self._log("Checking R dependencies", data=CH)
 
             # ── 1. Rscript ────────────────────────────────────────────────
-            #rscript_path = find_rscript()
+            # rscript_path = find_rscript()
             if not rscript_path:
                 self._log(
                     "R is not installed or Rscript could not be found",
@@ -301,7 +301,7 @@ cat("integralrad OK\\n")
 
             script_path = Path.home() / ".pulmorisk" / "r" / "install_integralrad.R"
             script_path.parent.mkdir(parents=True, exist_ok=True)
-            script_path.write_text(r_script)
+            script_path.write_text(r_script, encoding="utf-8")
 
             # ── 6. Run R ──────────────────────────────────────────────────
             env = os.environ.copy()
@@ -309,12 +309,17 @@ cat("integralrad OK\\n")
                 {
                     "R_LIBS_USER": str(r_lib),
                     "R_LIBS": str(r_lib),
-                    "HOME": str(Path.home()),
                     "TMPDIR": tempfile.gettempdir(),
                     # Prevent R from opening a browser for package vignettes
                     "R_BROWSER": "false",
+                    "PYTHONUTF8": "1",
+                    "PYTHONIOENCODING": "utf-8",
                 }
             )
+
+            # Add ~/.local/bin without assuming Unix ':' separators.
+            user_bin = Path.home() / ".local" / "bin"
+            env["PATH"] = f"{user_bin}{os.pathsep}{env.get('PATH', '')}"
 
             try:
                 result = subprocess.run(
@@ -322,18 +327,29 @@ cat("integralrad OK\\n")
                     env=env,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=True,
                 )
                 # Surface R's stderr to the log so progress is visible
+                if result.stdout:
+                    for line in result.stdout.strip().splitlines():
+                        self._log(line, data=CH)
+
                 if result.stderr:
                     for line in result.stderr.strip().splitlines():
                         self._log(line, data=CH)
 
             except subprocess.CalledProcessError as e:
                 # Log both streams so the user can see exactly what failed
+                if e.stdout:
+                    for line in e.stdout.strip().splitlines():
+                        self._log(line, level="ERROR", data=CH)
+
                 if e.stderr:
                     for line in e.stderr.strip().splitlines():
                         self._log(line, level="ERROR", data=CH)
+
                 self._emit(AppEvent(type="ui_state", message="install_failed"))
                 self._emit(AppEvent(type="integral_status", message="install_failed"))
                 return

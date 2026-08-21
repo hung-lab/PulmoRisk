@@ -266,8 +266,7 @@ class SybilView:
         ctk.CTkLabel(
             batch_card,
             text=(
-                "Education: 1-6  •  Ethnicity: 1-4  •  "
-                "Yes/No fields: 0 = No, 1 = Yes"
+                "Education: 1-6  •  Ethnicity: 1-4  •  Yes/No fields: 0 = No, 1 = Yes"
             ),
             text_color=("gray40", "gray70"),
             justify="left",
@@ -346,12 +345,7 @@ class SybilView:
 
         ctk.CTkLabel(
             ethnicity_frame,
-            text=(
-                "1 = White\n"
-                "2 = Black\n"
-                "3 = Asian\n"
-                "4 = Other"
-            ),
+            text=("1 = White\n2 = Black\n3 = Asian\n4 = Other"),
             justify="left",
             anchor="w",
         ).pack(anchor="w")
@@ -833,10 +827,10 @@ class SybilView:
                 self._show_results(f"Batch complete:\n{event.data['output_path']}")
                 self._hide_overlay()
             elif event.data:
-                yearly = event.data.get("yearly", [])
+                # yearly = event.data.get("yearly", [])
                 epi = event.data.get("epi", 0.0)
-                lines = [f"Year {i + 1}: {v:.1%}" for i, v in enumerate(yearly)]
-                lines += ["", f"Final 6-year risk: {epi:.1%}"]
+                # lines = [f"Year {i + 1}: {v:.1%}" for i, v in enumerate(yearly)]
+                lines = ["", f"Final 6-year risk: {epi:.1%}"]
                 self._show_results("\n".join(lines))
 
         elif event.type == "ui_theme":

@@ -136,6 +136,8 @@ def r_package_installed(rscript: str, package: str) -> bool:
         [rscript, "-e", r_code],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env={**os.environ, "R_LIBS_USER": r_lib},
     )
     return result.returncode == 0
@@ -213,6 +215,8 @@ def find_rscript() -> str | None:
                 [str(candidate), "--version"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5,
             )
             if result.returncode == 0:
@@ -275,6 +279,7 @@ def format_percent(value: float, decimals: int = 3) -> str:
     percent = f"{value * 100:.{decimals}f}"
     return f"{percent.rstrip('0').rstrip('.')}%"
 
+
 def validate_rscript(path: Path) -> bool:
     if not path.is_file():
         return False
@@ -284,6 +289,8 @@ def validate_rscript(path: Path) -> bool:
             [str(path), "--version"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
         )
         return result.returncode == 0

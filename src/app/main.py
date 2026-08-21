@@ -1,6 +1,7 @@
 """Application entry point."""
 
 import platform
+import sys
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -18,6 +19,11 @@ from app.views.integral_view import IntegralView
 from app.views.main_view import MainWindow
 from app.views.splash_screen import SplashScreen
 from app.views.sybil_view import SybilView
+
+if sys.stdout:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr:
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
 def _set_icon(root: ctk.CTk) -> None:
