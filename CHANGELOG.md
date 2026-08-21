@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.12](https://github.com/hung-lab/PulmoRisk/compare/v1.4.11...v1.4.12) (2026-08-21)
+
+
+### Bug Fixes
+
+* bug related to windows encoding as well as hide the logpanel by default and only show 6 year sybil output ([b89eb08](https://github.com/hung-lab/PulmoRisk/commit/b89eb08b8b69cd1d8150639655125174daa9c916))
+
 ## [1.4.11](https://github.com/hung-lab/PulmoRisk/compare/v1.4.10...v1.4.11) (2026-08-18)
 
 
