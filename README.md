@@ -395,6 +395,8 @@ PulmoRisk should now open normally.
 
 **INTEGRAL-Radiomics install fails** — Check the Activity Log panel for the exact error. Common causes are missing system libraries (`libssl-dev`, `libcurl4-openssl-dev`) on Linux. The INTEGRAL tab will be unavailable but Sybil-Epi will still work.
 
+One common cause for this error is when the RTools are missing. The R package `integralrad` is installed from GitHub, so R has to build it from source, which requires [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (a C/C++ compiler toolchain). To solve this problem, install the Rtools version matching your R version (e.g. Rtools45 for R 4.5.x), keep the installer's default options (it adds itself to `PATH` automatically), then restart and relaunch PulmoRisk so it can retry the install.
+
 **GUI does not appear on Linux** — Ensure `DISPLAY` is set and the X11 server is running. For Docker: `xhost +local:docker` before starting the container.
 
 **Blank CT inference result** — Confirm the CT folder contains valid DICOM files and is not empty.
