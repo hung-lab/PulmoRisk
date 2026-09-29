@@ -239,21 +239,30 @@ def find_integral_cli() -> str | None:
     Returns the path string if found and executable, else None.
     """
     cli_name = "integral-radiomics"
-    if sys.platform == "win32":
-        cli_name = "integral-radiomics.exe"
 
     # 1. PATH — covers any install the user has already configured.
+    #    Leave the extension off on Windows so shutil.which resolves it
+    #    against PATHEXT (Rapp launchers are usually .bat, not .exe).
     path_result = shutil.which(cli_name)
     if path_result:
         return path_result
 
+    # Rapp launcher files on Windows are batch scripts by default.
+    win_names = [cli_name + ext for ext in (".bat", ".cmd", ".exe")]
+
     # 2. Known install locations for integralrad::install_integralrad_cli()
     #    (via the Rapp package), checked in order of likelihood.
-    candidates: list[Path] = [
+    bin_dirs: list[Path] = [
         # Linux / macOS — Rapp default user bin
-        Path.home() / ".local" / "bin" / cli_name,
+        Path.home() / ".local" / "bin",
+        # Windows — Rapp default launcher directory
+        Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+        / "Programs"
+        / "R"
+        / "Rapp"
+        / "bin",
         # App-managed install location (used by check_and_install_integral)
-        Path.home() / ".pulmorisk" / "bin" / cli_name,
+        Path.home() / ".pulmorisk" / "bin",
         # macOS — Rapp installs here when ~/.local/bin is not used
         Path.home()
         / "Library"
@@ -261,12 +270,14 @@ def find_integral_cli() -> str | None:
         / "org.R-project.R"
         / "R"
         / "Rapp"
-        / "bin"
-        / cli_name,
+        / "bin",
         # Rapp can also install into the R user data dir on Linux
-        Path.home() / ".local" / "share" / "R" / "Rapp" / "bin" / cli_name,
-        Path.home() / "Library" / "R" / "Rapp" / "bin" / cli_name,
+        Path.home() / ".local" / "share" / "R" / "Rapp" / "bin",
+        Path.home() / "Library" / "R" / "Rapp" / "bin",
     ]
+
+    names = win_names if sys.platform == "win32" else [cli_name]
+    candidates = [d / name for d in bin_dirs for name in names]
 
     for candidate in candidates:
         if candidate.exists() and os.access(candidate, os.X_OK):

@@ -103,19 +103,9 @@ class MainWindow:
         text.insert(
             "end",
             "Sybil-Epi is a lung cancer risk prediction model that integrates key clinical and epidemiologic factors with deep learning model. "
-            "The analysis with Sybil-Epi requires only one single LDCT series, with no additional nodule annotation or segmentation, "
-            "combined with other 11 clinical risk factors, which are: \n\n"
-            "- age\n"
-            "- BMI\n"
-            "- education level\n"
-            "- ethnicity\n"
-            "- COPD history\n"
-            "- family lung cancer history\n"
-            "- personal cancer history\n"
-            "- smoking status\n"
-            "- smoking duration\n"
-            "- smoking intensity\n"
-            "- smoking quit time\n\n"
+            "The analysis with Sybil-Epi requires only one single LDCT series, with no additional nodule annotation or segmentation,\n"
+            "combined with other 11 clinical risk factors, which are: age, BMI, education level, ethnicity, COPD history, family lung cancer history,\n"
+            "personal cancer history, smoking status, smoking duration, smoking intensity, and smoking quit time\n\n"
             "More information on Sybil-Epi can be a found at ",
         )
         _add_link(

@@ -212,7 +212,7 @@ class AppController(BaseController):
 
             # ── 2. PATH for CLI ───────────────────────────────────────────
             user_bin = Path.home() / ".local" / "bin"
-            os.environ["PATH"] = f"{user_bin}:{os.environ.get('PATH', '')}"
+            os.environ["PATH"] = f"{user_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
             if not r_package_installed(rscript_path, "integralrad"):
                 self._log(
