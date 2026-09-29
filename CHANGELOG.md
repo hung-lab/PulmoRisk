@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.13](https://github.com/hung-lab/PulmoRisk/compare/v1.4.12...v1.4.13) (2026-09-29)
+
+
+### Bug Fixes
+
+* bug related to the app not finding R in windows and not being able to install INTEGRAL-Radiomics well ([b281a3a](https://github.com/hung-lab/PulmoRisk/commit/b281a3adc1fedd435558b6017099ab3848ccec4b))
+* modify text in home page to have a same text structure for both models ([96820ad](https://github.com/hung-lab/PulmoRisk/commit/96820ad49cecade6e04ea9486aaa85a1203f5fba))
+* solve issues raised by the continuous integration tests ([e8ca703](https://github.com/hung-lab/PulmoRisk/commit/e8ca7031c6ae5085b94c921b3fe39c43c2ccfd83))
+* solve issues raised by the continuous integration tests ([cf93f4f](https://github.com/hung-lab/PulmoRisk/commit/cf93f4f70ad7c8a62211516e0ed0ee85fe91e491))
+
 ## [1.4.12](https://github.com/hung-lab/PulmoRisk/compare/v1.4.11...v1.4.12) (2026-08-21)
 
 
