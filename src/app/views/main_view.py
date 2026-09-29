@@ -84,36 +84,75 @@ class MainWindow:
                 tag, "<Leave>", lambda _: text._textbox.configure(cursor="")
             )
 
-        def copy_citation():
-            self.root.clipboard_clear()
-            self.root.clipboard_append(citation)
-            copy_button.configure(text="✓ Copied!")
-            self.root.after(
-                2000, lambda: copy_button.configure(text="📋 Copy Citation")
+        def _add_copy_citation_button(citation_text: str) -> None:
+            def copy_citation():
+                self.root.clipboard_clear()
+                self.root.clipboard_append(citation_text)
+                copy_button.configure(text="✓ Copied!")
+                self.root.after(
+                    2000, lambda: copy_button.configure(text="📋 Copy Citation")
+                )
+
+            copy_button = ctk.CTkButton(
+                text._textbox,
+                text="📋 Copy Citation",
+                command=copy_citation,
+                width=110,
+                height=24,
+                font=ctk.CTkFont(size=11),
+                fg_color=ERROR_COLOUR,
+                hover_color=ERROR_COLOUR_HOVER,
             )
+
+            text._textbox.window_create("end", window=copy_button)
 
         text.insert(
             "end",
             "This software tool implements two validated machine learning models, "
-            "which can estimate lung cancer risk based on low-dose CT (LDCT) images and clinical and epidemiologic factors.\n\n"
-            "Two validated models are available:\n\n",
+            "which can estimate lung cancer risk based on low-dose CT (LDCT) images and clinical and epidemiologic factors.\n\n",
         )
 
         text.insert("end", "Sybil-Epi\n", "heading")
         text.insert(
             "end",
-            "Sybil-Epi is a lung cancer risk prediction model that integrates key clinical and epidemiologic factors with deep learning model. "
-            "The analysis with Sybil-Epi requires only one single LDCT series, with no additional nodule annotation or segmentation,\n"
-            "combined with other 11 clinical risk factors, which are: age, BMI, education level, ethnicity, COPD history, family lung cancer history,\n"
-            "personal cancer history, smoking status, smoking duration, smoking intensity, and smoking quit time\n\n"
+            "Sybil-Epi is a lung cancer risk prediction model that integrates image features extracted with a deep learning model, together with "
+            "key clinical and epidemiologic factors. The analysis with Sybil-Epi requires only one single LDCT series, with no additional nodule "
+            "annotation or segmentation, combined with other 11 clinical risk factors.\n\n"
             "More information on Sybil-Epi can be a found at ",
         )
         _add_link(
-            "https://journal.chestnet.org/article/S0012-3692(26)00296-5/fulltext.",
+            "https://journal.chestnet.org/article/S0012-3692(26)00296-5/fulltext",
             "https://journal.chestnet.org/article/S0012-3692(26)00296-5/fulltext",
         )
         text.insert("end", "\n\n")
-        _add_link("View on GitHub", "https://github.com/hung-lab/Sybil-Epi")
+        text.insert(
+            "end",
+            "If you have questions about the Sybil-Epi model, please file an issue on GitHub ",
+        )
+        _add_link(
+            "(https://github.com/hung-lab/Sybil-Epi)",
+            "https://github.com/hung-lab/Sybil-Epi",
+        )
+        text.insert("end", "\n\n")
+
+        text.insert(
+            "end",
+            "If you use this model in your work, please cite:\n\n",
+        )
+        citation = (
+            "Phellan-Aro R, Lam S, Warkentin MT, Liu G, Diergaarde B, "
+            "Wilson DO, Yuan JM, Al-Sawaihey H, Murison K, Khodayari-Moez E, "
+            "Brhane Y, Meza R, Myers R, Hung RJ. "
+            "Integrating Deep Learning of Low-Dose CT Imaging With "
+            "Clinical Data for Lung Cancer Risk Prediction. Chest. 2026 Mar 13;170(3):962-74.\n\n"
+        )
+
+        text.insert(
+            "end",
+            citation,
+        )
+
+        _add_copy_citation_button(citation)
         text.insert("end", "\n\n")
 
         text.insert("end", "INTEGRAL-Radiomics\n", "heading")
@@ -125,11 +164,11 @@ class MainWindow:
             "based on the user-provided image (LDCT) and nodule mask. "
             "The user must also provide a set of epidemiological features including: age, sex, body mass index (BMI), "
             "family history of lung cancer, personal history of COPD/emphysema, smoking status, smoking duration, "
-            "smoking intensity, and smoking quit time."
+            "smoking intensity, and smoking quit time.\n\n"
             "More information on INTEGRAL-Radiomics can be a found at ",
         )
         _add_link(
-            "https://thorax.bmj.com/content/79/4/307.long.",
+            "https://thorax.bmj.com/content/79/4/307.long",
             "https://thorax.bmj.com/content/79/4/307.long",
         )
         text.insert("end", "\n\n")
@@ -160,18 +199,7 @@ class MainWindow:
             citation,
         )
 
-        copy_button = ctk.CTkButton(
-            text._textbox,
-            text="📋 Copy Citation",
-            command=copy_citation,
-            width=110,
-            height=24,
-            font=ctk.CTkFont(size=11),
-            fg_color=ERROR_COLOUR,
-            hover_color=ERROR_COLOUR_HOVER,
-        )
-
-        text._textbox.window_create("end", window=copy_button)
+        _add_copy_citation_button(citation)
         text.insert("end", "\n\n")
 
         text.insert("end", "\n\n\n\n")
