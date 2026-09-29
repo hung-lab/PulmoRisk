@@ -12,7 +12,7 @@ def root():
     """Fake Tk root that captures after() callbacks and runs them immediately."""
     r = MagicMock()
     # Execute the scheduled callback immediately so we don't need a real mainloop
-    r.after.side_effect = lambda delay, fn: fn()
+    r.after.side_effect = lambda _delay, fn: fn()
     return r
 
 

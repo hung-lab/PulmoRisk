@@ -25,6 +25,16 @@ from app.utils.validators import BatchSybilRowParser, ParseError
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
+# Populated lazily off the main thread in load_model() (importing sybil pulls
+# in torch, which is too slow to do on the UI thread). Kept as a module-level
+# name — rather than a local import inside the thread — so it stays patchable
+# in tests via app.controllers.sybil_controller.Sybil.
+Sybil = None
+
+# torch.set_num_interop_threads() aborts the process (not a catchable
+# exception) if called more than once, so this must only ever run once.
+_torch_threads_configured = False
+
 
 class SybilController(BaseController):
     def __init__(self, root, bus: EventBus):
@@ -39,16 +49,22 @@ class SybilController(BaseController):
         self._log("Loading Sybil model...")
 
         def _task():
+            global Sybil, _torch_threads_configured
             try:
                 import torch  # noqa: PLC0415
 
-                torch.set_num_threads(2)
-                torch.set_num_interop_threads(1)
+                if not _torch_threads_configured:
+                    torch.set_num_threads(2)
+                    torch.set_num_interop_threads(1)
+                    _torch_threads_configured = True
                 # Force CPU — prevents torch from looking for CUDA at runtime
                 os.environ["CUDA_VISIBLE_DEVICES"] = ""
-                # lazy import — runs off main thread so GIL contention
-                # during import doesn't block the UI
-                from sybil import Sybil  # noqa: PLC0415
+                if Sybil is None:
+                    # lazy import — runs off main thread so GIL contention
+                    # during import doesn't block the UI
+                    from sybil import Sybil as _Sybil  # noqa: PLC0415
+
+                    Sybil = _Sybil
 
                 self._model = Sybil("sybil_ensemble")
                 self._log("Sybil model ready.", "SUCCESS")

@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from app.models.individual_model import SybilInputData
+from app.models.individual_model import ModelValidationError, SybilInputData
 from app.utils.sybil_epi import (
     EpiInput,
     calculate_sybil_epi_score,
@@ -208,9 +208,8 @@ class TestEpiInputFromPatientData:
         assert epi.ethnicity == "Others"
 
     def test_invalid_ethnicity_raises(self, base_patient):
-        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 99})
-        with pytest.raises(KeyError):
-            epi_input_from_individual_data(patient, 0.05)
+        with pytest.raises(ModelValidationError):
+            SybilInputData(**{**base_patient.__dict__, "ethnicity": 99})
 
     def test_sybil_score_forwarded(self, base_patient):
         epi = epi_input_from_individual_data(base_patient, 0.123)

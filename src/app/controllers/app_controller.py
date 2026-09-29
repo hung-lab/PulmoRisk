@@ -322,7 +322,7 @@ cat("integralrad OK\\n")
             env["PATH"] = f"{user_bin}{os.pathsep}{env.get('PATH', '')}"
 
             try:
-                result = subprocess.run(
+                result = subprocess.run(  # nosec B603
                     [rscript_path, "--vanilla", str(script_path)],
                     env=env,
                     capture_output=True,

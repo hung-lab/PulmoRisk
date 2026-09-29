@@ -30,6 +30,8 @@ def controller(bus, split_view, sybil_form):
         bus=bus,
         split_view=split_view,
         sybil_form=sybil_form,
+        integral_form=MagicMock(),
+        splash=MagicMock(),
     )
 
 
@@ -142,5 +144,7 @@ class TestBusSubscription:
             bus=bus,
             split_view=split_view,
             sybil_form=sybil_form,
+            integral_form=MagicMock(),
+            splash=MagicMock(),
         )
         bus.subscribe.assert_called()

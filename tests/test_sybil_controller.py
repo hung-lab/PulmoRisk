@@ -173,7 +173,7 @@ class TestOnComplete:
         result_events = [
             c[0][0]
             for c in controller.bus.emit.call_args_list
-            if c[0][0].type == "result"
+            if c[0][0].type == "sybil_result"
         ]
         assert result_events
         assert result_events[0].data["yearly"] == yearly

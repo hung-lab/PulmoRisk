@@ -58,7 +58,7 @@ class TestModelImports:
 
 class TestUtilityImports:
     def test_event_bus_imports(self):
-        from app.utils.event_bus import EventBus, AppEvent
+        from app.utils.event_bus import AppEvent, EventBus
 
         assert EventBus is not None
         assert AppEvent is not None
@@ -77,9 +77,9 @@ class TestUtilityImports:
 
     def test_validator_imports(self):
         from app.utils.validators import (
-            FieldParser,
-            BatchSybilRowParser,
             BatchIntegralRowParser,
+            BatchSybilRowParser,
+            FieldParser,
         )
 
         assert FieldParser is not None
@@ -88,9 +88,9 @@ class TestUtilityImports:
 
     def test_sybil_epi_imports(self):
         from app.utils.sybil_epi import (
+            EpiInput,
             calculate_sybil_epi_score,
             epi_input_from_individual_data,
-            EpiInput,
         )
 
         assert calculate_sybil_epi_score is not None
@@ -98,7 +98,7 @@ class TestUtilityImports:
         assert EpiInput is not None
 
     def test_helpers_imports(self):
-        from app.utils.helpers import center_window, resource_path, resolve_color
+        from app.utils.helpers import center_window, resolve_color, resource_path
 
         assert center_window is not None
         assert resource_path is not None
@@ -108,11 +108,6 @@ class TestUtilityImports:
         from app.config.settings import (
             LEVEL_COLOURS,
             LEVEL_PREFIX,
-            PRIMARY_LIGHT,
-            PRIMARY_DARK,
-            ACCENT_LIGHT,
-            ACCENT_DARK,
-            ERROR_COLOUR,
         )
 
         assert isinstance(LEVEL_COLOURS, dict)
@@ -122,13 +117,11 @@ class TestUtilityImports:
 
     def test_ui_config_imports(self):
         from app.utils.ui_config import (
-            SPACE_XS,
-            SPACE_SM,
-            SPACE_MD,
             SPACE_LG,
+            SPACE_MD,
+            SPACE_SM,
             SPACE_XL,
-            INPUT_WIDTH,
-            LABEL_WIDTH,
+            SPACE_XS,
         )
 
         assert SPACE_XS < SPACE_SM < SPACE_MD < SPACE_LG < SPACE_XL
@@ -145,7 +138,6 @@ class TestControllerImports:
 
     def test_base_controller_constructs(self):
         from app.controllers.base_controller import BaseController
-        from app.utils.event_bus import EventBus
 
         ctrl = BaseController(root=MagicMock(), bus=MagicMock())
         assert ctrl is not None
@@ -163,6 +155,8 @@ class TestControllerImports:
             bus=MagicMock(),
             split_view=MagicMock(),
             sybil_form=MagicMock(),
+            integral_form=MagicMock(),
+            splash=MagicMock(),
         )
         assert ctrl is not None
 
@@ -206,7 +200,7 @@ class TestControllerImports:
 
 class TestEventBusWiring:
     def test_event_bus_subscribe_and_emit(self):
-        from app.utils.event_bus import EventBus, AppEvent
+        from app.utils.event_bus import AppEvent, EventBus
 
         root = MagicMock()
         call_count = 0
@@ -230,7 +224,6 @@ class TestEventBusWiring:
 
     def test_base_controller_log_reaches_bus(self):
         from app.controllers.base_controller import BaseController
-        from app.utils.event_bus import AppEvent
 
         bus = MagicMock()
         ctrl = BaseController(root=MagicMock(), bus=bus)
