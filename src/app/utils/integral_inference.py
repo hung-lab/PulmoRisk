@@ -1,6 +1,6 @@
 import json
 import os
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 from pathlib import Path
 from typing import TypeAlias
@@ -83,7 +83,7 @@ def run_inference_pipeline(individual: IntegralClinicalData) -> prediction:
         rscript_path = find_rscript()
 
         # Run R subprocess
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             [rscript_path, "-e", r_code],
             env=env,
             capture_output=True,

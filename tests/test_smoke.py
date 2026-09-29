@@ -163,6 +163,8 @@ class TestControllerImports:
             bus=MagicMock(),
             split_view=MagicMock(),
             sybil_form=MagicMock(),
+            integral_form=MagicMock(),
+            splash=MagicMock(),
         )
         assert ctrl is not None
 

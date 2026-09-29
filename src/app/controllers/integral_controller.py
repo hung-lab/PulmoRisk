@@ -130,7 +130,7 @@ class IntegralController(BaseController):
             rscript_path = find_rscript()
 
             # Run R subprocess
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 [rscript_path, "-e", r_code],
                 env=env,
                 capture_output=True,

@@ -1,6 +1,6 @@
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tkinter.font as tkfont
 import webbrowser
@@ -45,7 +45,7 @@ def resolve_color(light: str, dark: str) -> str:
 def open_url(url: str) -> None:
     if sys.platform.startswith("linux"):
         try:
-            subprocess.Popen(["xdg-open", url])
+            subprocess.Popen(["xdg-open", url])  # nosec B603 B607
         except FileNotFoundError:
             webbrowser.open(url)  # fallback if xdg-open not available
     else:
@@ -132,7 +132,7 @@ def r_package_installed(rscript: str, package: str) -> bool:
         f'.libPaths(c("{r_lib}", .libPaths())); '
         f'quit(status = ifelse(requireNamespace("{package}", quietly = TRUE), 0, 1))'
     )
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603
         [rscript, "-e", r_code],
         capture_output=True,
         text=True,
@@ -211,7 +211,7 @@ def find_rscript() -> str | None:
         if not candidate.exists():
             continue
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 [str(candidate), "--version"],
                 capture_output=True,
                 text=True,
@@ -221,7 +221,7 @@ def find_rscript() -> str | None:
             )
             if result.returncode == 0:
                 return str(candidate)
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             continue
 
     return None
@@ -296,7 +296,7 @@ def validate_rscript(path: Path) -> bool:
         return False
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             [str(path), "--version"],
             capture_output=True,
             text=True,
