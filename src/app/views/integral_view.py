@@ -322,11 +322,11 @@ class IntegralView:
         self._entry(p, "bmi", "BMI (kg/m^2) ", self._bmi_var, self._bmi_error)
         self._dropdown(p, "Sex", self._gender_var, list(SEX_OPTIONS.keys()))
 
-        self._switch(p, "Family history of lung cancer", self._fhlc_var)
-        self._switch(p, "COPD / emphysema", self._copd_var)
+        self._checkbox(p, "Family history of lung cancer", self._fhlc_var)
+        self._checkbox(p, "COPD / emphysema", self._copd_var)
 
     def _build_smoking(self, p: ctk.CTkFrame):
-        self._switch(p, "Former smoker", self._former_smoker_var)
+        self._checkbox(p, "Former smoker", self._former_smoker_var)
         self._entry(
             p,
             "duration",
@@ -453,11 +453,17 @@ class IntegralView:
 
         return entry
 
-    def _switch(self, parent: ctk.CTkFrame, label: str, var: tk.BooleanVar) -> None:
+    def _checkbox(self, parent: ctk.CTkFrame, label: str, var: tk.BooleanVar) -> None:
         r = self._row(parent)
         self._label(r, label)
-        switch = ctk.CTkSwitch(r, text="", variable=var)
-        switch.grid(row=0, column=1, sticky="w")
+
+        checkbox = ctk.CTkCheckBox(r, text="0 - No", variable=var)
+        checkbox.grid(row=0, column=1, sticky="w")
+
+        def _update_text(*_args):
+            checkbox.configure(text="1 - Yes" if var.get() else "0 - No")
+
+        var.trace_add("write", _update_text)
 
     def _dropdown(
         self,
@@ -608,7 +614,6 @@ class IntegralView:
         self._former_smoker_var.set(False)
         self._duration_var.set("")
         self._cigday_var.set("")
-        self._quit_var.set("0")
         self._bmi_var.set("")
         self._image_file_var.set("No file selected")
         self._mask_file_var.set("No file selected")

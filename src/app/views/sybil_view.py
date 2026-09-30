@@ -9,7 +9,9 @@ import customtkinter as ctk
 
 from app.config.settings import (
     BORDER_COLOUR,
+    DISABLED_TEXT_COLOUR,
     ERROR_COLOUR,
+    TEXT_COLOUR,
     WARNING_COLOUR,
     WARNING_COLOUR_HOVER,
 )
@@ -38,19 +40,19 @@ if TYPE_CHECKING:
 # ── Option maps (display label → integer code stored in SybilInputData) ──────
 
 EDUCATION_OPTIONS: dict[str, int] = {
-    "Less than high school graduate": 1,
-    "High school graduate": 2,
-    "Some training after high school": 3,
-    "Some college": 4,
-    "College graduate": 5,
-    "Postgraduate / professional degree": 6,
+    "1 - Less than high school graduate": 1,
+    "2 - High school graduate": 2,
+    "3 - Some training after high school": 3,
+    "4 - Some college": 4,
+    "5 - College graduate": 5,
+    "6 - Postgraduate or professional degree": 6,
 }
 
-ETHNICITY_OPTIONS: dict[str, int] = {
-    "White": 1,
-    "Black": 2,
-    "Asian": 3,
-    "Other": 4,
+ETHNICITY_OPTIONS: dict[str, str] = {
+    "Asian": "Asian",
+    "Black": "Black",
+    "White": "White",
+    "Others": "Others",
 }
 
 # Overlay stage labels keyed by the log messages the controller emits.
@@ -78,10 +80,11 @@ class SybilView:
         self._personal_cancer_var = tk.BooleanVar(value=False)
         self._smoking_duration_var = tk.StringVar()
         self._smoking_intensity_var = tk.StringVar()
-        self._smoking_quit_time_var = tk.StringVar(value="0")
+        self._smoking_quit_time_var = tk.StringVar()
         self._smoking_status_var = tk.BooleanVar(value=False)
         self._ct_dir_var = tk.StringVar(value="No folder selected")
         self._six_year_risk = tk.StringVar()
+        self._ct_input_mode_var = tk.StringVar(value="ct")
 
         # ── validation error vars ─────────────────────────────────────────
         self._age_error_var = tk.StringVar()
@@ -182,7 +185,7 @@ class SybilView:
         self._card("Medical History", self._build_history, self._single_frame)
         self._card("Smoking History", self._build_smoking, self._single_frame)
         self._card(
-            "CT Scan (Sybil-Epi uses DICOM files)", self._build_ct, self._single_frame
+            "6-Year Risk Sybil", self._build_ct, self._single_frame
         )
 
         # ─────────────────────────────────────────────────────────────
@@ -243,9 +246,9 @@ class SybilView:
             "age,bmi,copd,education,ethnicity,family_lc_history,"
             "personal_cancer_history,smoking_duration,smoking_intensity,"
             "smoking_quit_time,smoking_status,ct_scan_dir,six_year_risk\n"
-            "65,27.4,0,5,1,1,0,30,20,5,0,/data/patient_001,\n"
-            "58,31.2,1,4,2,0,0,35,15,0,1,/data/patient_002,\n"
-            "72,25.8,0,6,1,1,1,40,25,2,0,/data/patient_003,"
+            "65,27.4,0,5,White,1,0,30,20,5,0,/data/patient_001,\n"
+            "58,31.2,1,4,Black,0,0,35,15,0,1,/data/patient_002,\n"
+            "72,25.8,0,6,White,1,1,40,25,2,0,/data/patient_003,"
         )
 
         example_box = ctk.CTkTextbox(
@@ -266,7 +269,8 @@ class SybilView:
         ctk.CTkLabel(
             batch_card,
             text=(
-                "Education: 1-6  •  Ethnicity: 1-4  •  Yes/No fields: 0 = No, 1 = Yes"
+                "Education: 1-6  •  Ethnicity: White, Black, Asian, Others  •  "
+                "Yes/No fields: 0 = No, 1 = Yes"
             ),
             text_color=("gray40", "gray70"),
             justify="left",
@@ -321,31 +325,6 @@ class SybilView:
                 "5 = College graduate\n"
                 "6 = Postgraduate / professional degree"
             ),
-            justify="left",
-            anchor="w",
-        ).pack(anchor="w")
-
-        # Ethnicity
-        ethnicity_frame = ctk.CTkFrame(
-            mapping_frame,
-            fg_color="transparent",
-            border_width=0,
-        )
-        ethnicity_frame.grid(
-            row=0,
-            column=1,
-            sticky="nw",
-        )
-
-        ctk.CTkLabel(
-            ethnicity_frame,
-            text="Ethnicity",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", pady=(0, SPACE_XS))
-
-        ctk.CTkLabel(
-            ethnicity_frame,
-            text=("1 = White\n2 = Black\n3 = Asian\n4 = Other"),
             justify="left",
             anchor="w",
         ).pack(anchor="w")
@@ -432,12 +411,12 @@ class SybilView:
         self._dropdown(p, "Ethnicity", self._ethnicity_var, list(ETHNICITY_OPTIONS))
 
     def _build_history(self, p: ctk.CTkFrame) -> None:
-        self._switch(p, "COPD", self._copd_var)
-        self._switch(p, "Family history of lung cancer", self._family_lc_var)
-        self._switch(p, "Personal history of any cancer", self._personal_cancer_var)
+        self._checkbox(p, "COPD", self._copd_var)
+        self._checkbox(p, "Family history of lung cancer", self._family_lc_var)
+        self._checkbox(p, "Personal history of any cancer", self._personal_cancer_var)
 
     def _build_smoking(self, p: ctk.CTkFrame) -> None:
-        self._switch(p, "Current smoker", self._smoking_status_var)
+        self._checkbox(p, "Current smoker", self._smoking_status_var)
         self._entry(
             p,
             "smoking_duration",
@@ -461,8 +440,29 @@ class SybilView:
         )
 
     def _build_ct(self, p: ctk.CTkFrame) -> None:
+        note_row = self._row(p)
+        ctk.CTkLabel(
+            note_row,
+            text=(
+                "Please, either select the folder containing the CT Scan "
+                "in DICOM format or manually type a previously calculated "
+                "6-Year Risk Sybil value."
+            ),
+            font=ctk.CTkFont(size=12, slant="italic"),
+            anchor="w",
+            justify="left",
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, SPACE_XS))
+
         r = self._row(p)
-        self._label(r, "CT Scan Folder")
+        self._ct_radio = ctk.CTkRadioButton(
+            r,
+            text="CT Scan Folder",
+            variable=self._ct_input_mode_var,
+            value="ct",
+            width=LABEL_WIDTH,
+            command=self._on_ct_input_mode_change,
+        )
+        self._ct_radio.grid(row=0, column=0, sticky="w", padx=(0, SPACE_SM))
 
         container = ctk.CTkFrame(
             r, width=INPUT_WIDTH, fg_color="transparent", border_width=0
@@ -471,12 +471,16 @@ class SybilView:
         container.grid_propagate(False)
 
         # Path label
-        path_label = ctk.CTkLabel(container, textvariable=self._ct_dir_var, anchor="w")
-        path_label.pack(fill="both", expand=True)
+        self._ct_path_label = ctk.CTkLabel(
+            container, textvariable=self._ct_dir_var, anchor="w"
+        )
+        self._ct_path_label.pack(fill="both", expand=True)
 
         # Browse button (same row, new column)
-        browse_btn = ctk.CTkButton(container, text="Browse", command=self._browse)
-        browse_btn.pack(anchor="w", pady=(SPACE_XS, 0))
+        self._ct_browse_btn = ctk.CTkButton(
+            container, text="Browse", command=self._browse
+        )
+        self._ct_browse_btn.pack(anchor="w", pady=(SPACE_XS, 0))
 
         # Error row
         err_row = self._row(p)
@@ -488,13 +492,59 @@ class SybilView:
             font=ctk.CTkFont(size=12),
         )
         error.grid(row=0, column=1, sticky="w", pady=(SPACE_XS, 0))
-        self._entry(
-            p,
-            "risk",
-            "6-year Risk Sybil",
-            self._six_year_risk,
-            self._six_year_risk_error_var,
+
+        # ── 6-year Sybil risk (mutually exclusive with the CT folder) ──────
+        risk_row = self._row(p)
+        self._risk_radio = ctk.CTkRadioButton(
+            risk_row,
+            text="6-year Risk Sybil",
+            variable=self._ct_input_mode_var,
+            value="risk",
+            width=LABEL_WIDTH,
+            command=self._on_ct_input_mode_change,
         )
+        self._risk_radio.grid(row=0, column=0, sticky="w", padx=(0, SPACE_SM))
+
+        risk_container = ctk.CTkFrame(
+            risk_row, width=INPUT_WIDTH, fg_color="transparent", border_width=0
+        )
+        risk_container.grid(row=0, column=1, sticky="w")
+        risk_container.grid_propagate(False)
+
+        risk_entry = ctk.CTkEntry(risk_container, textvariable=self._six_year_risk)
+        risk_entry.pack(fill="both", expand=True)
+        self._entries["risk"] = risk_entry
+
+        risk_error_row = self._row(p)
+        risk_error = ctk.CTkLabel(
+            risk_error_row,
+            textvariable=self._six_year_risk_error_var,
+            text_color=ERROR_COLOUR,
+            font=ctk.CTkFont(size=12),
+        )
+        risk_error.grid(row=0, column=1, sticky="w", pady=(SPACE_XS, 0))
+
+        self._on_ct_input_mode_change()
+
+    def _on_ct_input_mode_change(self) -> None:
+        """Only one of CT folder / 6-year risk can be active at a time."""
+        ct_active = self._ct_input_mode_var.get() == "ct"
+
+        self._ct_browse_btn.configure(state="normal" if ct_active else "disabled")
+        self._entries["risk"].configure(state="disabled" if ct_active else "normal")
+
+        ct_colour = TEXT_COLOUR if ct_active else DISABLED_TEXT_COLOUR
+        risk_colour = DISABLED_TEXT_COLOUR if ct_active else TEXT_COLOUR
+        self._ct_radio.configure(text_color=ct_colour)
+        self._ct_path_label.configure(text_color=ct_colour)
+        self._risk_radio.configure(text_color=risk_colour)
+
+        if ct_active:
+            self._six_year_risk.set("")
+            self._six_year_risk_error_var.set("")
+        else:
+            self._ct_dir_var.set("No folder selected")
+            self._ct_error_var.set("")
 
     # ─────────────────────────────── WIDGET FACTORIES ────────────────────
 
@@ -531,11 +581,17 @@ class SybilView:
 
         return entry
 
-    def _switch(self, parent: ctk.CTkFrame, label: str, var: tk.BooleanVar) -> None:
+    def _checkbox(self, parent: ctk.CTkFrame, label: str, var: tk.BooleanVar) -> None:
         r = self._row(parent)
         self._label(r, label)
-        switch = ctk.CTkSwitch(r, text="", variable=var)
-        switch.grid(row=0, column=1, sticky="w")
+
+        checkbox = ctk.CTkCheckBox(r, text="0 - No", variable=var)
+        checkbox.grid(row=0, column=1, sticky="w")
+
+        def _update_text(*_args):
+            checkbox.configure(text="1 - Yes" if var.get() else "0 - No")
+
+        var.trace_add("write", _update_text)
 
     def _dropdown(
         self,
@@ -573,6 +629,9 @@ class SybilView:
         self._overlay.hide()
         self.run_button.configure(state="normal")
         self._set_widgets_state("normal")
+        # Re-apply CT/risk mutual exclusivity — the blanket re-enable above
+        # would otherwise also re-enable the currently-inactive field.
+        self._on_ct_input_mode_change()
 
     def _set_widgets_state(self, state: str) -> None:
         """Recursively enable/disable all input widgets in the form."""
@@ -584,6 +643,7 @@ class SybilView:
                 ctk.CTkSwitch,
                 ctk.CTkOptionMenu,
                 ctk.CTkCheckBox,
+                ctk.CTkRadioButton,
             )
             if isinstance(widget, with_state):
                 with contextlib.suppress(Exception):
@@ -634,6 +694,13 @@ class SybilView:
     def _on_mode_changed(self, _=None) -> None:
         mode = self._mode_var.get()
 
+        # Pull the results card out before swapping frames — re-packing an
+        # already-mapped widget doesn't reliably move it to the end of the
+        # sibling order, so it has to be forgotten and re-added fresh.
+        had_results = self._results_frame.winfo_ismapped()
+        if had_results:
+            self._results_frame.pack_forget()
+
         if mode == "single":
             self._batch_frame.pack_forget()
             self._single_frame.pack(fill="both", expand=True)
@@ -650,6 +717,9 @@ class SybilView:
 
             self._subtitle.configure(text="Run Sybil-Epi on multiple individuals")
 
+        if had_results:
+            self._results_frame.pack(fill="x", pady=SPACE_SM)
+
     def reset(self) -> None:
         """Clear all inputs and results — called by new_run action."""
         self._age_var.set("")
@@ -661,10 +731,12 @@ class SybilView:
         self._personal_cancer_var.set(False)
         self._smoking_duration_var.set("")
         self._smoking_intensity_var.set("")
-        self._smoking_quit_time_var.set("0")
+        self._smoking_quit_time_var.set("")
         self._smoking_status_var.set(False)
         self._ct_dir_var.set("No folder selected")
         self._six_year_risk.set("")
+        self._ct_input_mode_var.set("ct")
+        self._on_ct_input_mode_change()
         self._clear_errors()
         self._results_frame.pack_forget()
 
@@ -724,6 +796,20 @@ class SybilView:
         except ParseError as exc:
             parse_errors[exc.field] = exc.message
 
+        ct_scan_dir = (
+            self._ct_dir_var.get()
+            if self._ct_dir_var.get() != "No folder selected"
+            else None
+        )
+
+        # Only the selected input mode is required — mirrors the radio
+        # button choice rather than the generic "either/or" model message.
+        input_mode = self._ct_input_mode_var.get()
+        if input_mode == "ct" and not ct_scan_dir:
+            parse_errors["ct_scan_dir"] = "CT scan is required"
+        elif input_mode == "risk" and fields.get("six_year_risk") is None:
+            parse_errors["six_year_risk"] = "6-year Risk Sybil is required"
+
         if parse_errors:
             self._show_field_errors(parse_errors)  # highlight bad fields
             raise ValueError("Please fix the highlighted fields.")
@@ -732,13 +818,11 @@ class SybilView:
         fields.update(
             copd=int(self._copd_var.get()),
             education=EDUCATION_OPTIONS.get(self._education_var.get(), 1),
-            ethnicity=ETHNICITY_OPTIONS.get(self._ethnicity_var.get(), 1),
+            ethnicity=ETHNICITY_OPTIONS.get(self._ethnicity_var.get(), "White"),
             family_lc_history=int(self._family_lc_var.get()),
             personal_cancer_history=int(self._personal_cancer_var.get()),
             smoking_status=int(self._smoking_status_var.get()),
-            ct_scan_dir=self._ct_dir_var.get()
-            if self._ct_dir_var.get() != "No folder selected"
-            else None,
+            ct_scan_dir=ct_scan_dir,
         )
 
         # ── 3. Construct model — __post_init__ validates business rules ─────

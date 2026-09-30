@@ -40,7 +40,7 @@ def base_patient():
         bmi=27.0,
         copd=0,
         education=3,
-        ethnicity=1,  # White
+        ethnicity="White",
         family_lc_history=0,
         personal_cancer_history=0,
         smoking_duration=30.0,
@@ -188,28 +188,28 @@ class TestMonotonicity:
 
 
 class TestEpiInputFromPatientData:
-    def test_ethnicity_white_mapped(self, base_patient):
+    def test_ethnicity_white_forwarded(self, base_patient):
         epi = epi_input_from_individual_data(base_patient, 0.05)
         assert epi.ethnicity == "White"
 
-    def test_ethnicity_black_mapped(self, base_patient):
-        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 2})
+    def test_ethnicity_black_forwarded(self, base_patient):
+        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": "Black"})
         epi = epi_input_from_individual_data(patient, 0.05)
         assert epi.ethnicity == "Black"
 
-    def test_ethnicity_asian_mapped(self, base_patient):
-        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 3})
+    def test_ethnicity_asian_forwarded(self, base_patient):
+        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": "Asian"})
         epi = epi_input_from_individual_data(patient, 0.05)
         assert epi.ethnicity == "Asian"
 
-    def test_ethnicity_others_mapped(self, base_patient):
-        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": 4})
+    def test_ethnicity_others_forwarded(self, base_patient):
+        patient = SybilInputData(**{**base_patient.__dict__, "ethnicity": "Others"})
         epi = epi_input_from_individual_data(patient, 0.05)
         assert epi.ethnicity == "Others"
 
     def test_invalid_ethnicity_raises(self, base_patient):
         with pytest.raises(ModelValidationError):
-            SybilInputData(**{**base_patient.__dict__, "ethnicity": 99})
+            SybilInputData(**{**base_patient.__dict__, "ethnicity": "Martian"})
 
     def test_sybil_score_forwarded(self, base_patient):
         epi = epi_input_from_individual_data(base_patient, 0.123)

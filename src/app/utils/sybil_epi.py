@@ -113,18 +113,6 @@ _CALIBRATORS = [
     {"a": -0.8470538501992946, "b": 1.75067111594711300},
 ]
 
-# ---------------------------------------------------------------------------
-# Ethnicity mapping
-# NLST integer codes (used in SybilInputData) → EPI model string keys
-# ---------------------------------------------------------------------------
-
-_ETHNICITY_MAP: dict[int, str] = {
-    1: "White",
-    2: "Black",
-    3: "Asian",
-    4: "Others",
-}
-
 
 @dataclass
 class EpiInput:
@@ -207,19 +195,14 @@ def epi_input_from_individual_data(
 
     Returns:
         A ready-to-score :class:`EpiInput` instance.
-
-    Raises:
-        KeyError: If the ethnicity code in *individual* is not in the mapping.
     """
-
-    ethnicity_str = _ETHNICITY_MAP[individual.ethnicity]
 
     return EpiInput(
         age=individual.age,
         bmi=individual.bmi,
         copd=individual.copd,
         education=individual.education,
-        ethnicity=ethnicity_str,
+        ethnicity=individual.ethnicity,
         family_history=individual.family_lc_history,
         personal_history=individual.personal_cancer_history,
         smoking_duration=individual.smoking_duration,

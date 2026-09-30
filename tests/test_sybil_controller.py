@@ -32,7 +32,7 @@ def pending():
         bmi=27.0,
         copd=0,
         education=3,
-        ethnicity=1,
+        ethnicity="White",
         family_lc_history=0,
         personal_cancer_history=0,
         smoking_duration=30.0,

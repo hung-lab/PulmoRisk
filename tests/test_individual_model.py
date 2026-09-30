@@ -17,7 +17,7 @@ class TestSybilInputData:
             bmi=27.5,
             copd=0,
             education=3,
-            ethnicity=1,
+            ethnicity="White",
             family_lc_history=0,
             personal_cancer_history=1,
             smoking_duration=30.0,
@@ -33,7 +33,7 @@ class TestSybilInputData:
         assert sample.bmi == pytest.approx(27.5)
         assert sample.copd == 0
         assert sample.education == 3
-        assert sample.ethnicity == 1
+        assert sample.ethnicity == "White"
         assert sample.family_lc_history == 0
         assert sample.personal_cancer_history == 1
         assert sample.smoking_duration == pytest.approx(30.0)
@@ -74,7 +74,7 @@ class TestSybilInputData:
             bmi=27.5,
             copd=0,
             education=3,
-            ethnicity=1,
+            ethnicity="White",
             family_lc_history=0,
             personal_cancer_history=1,
             smoking_duration=30.0,
@@ -92,7 +92,7 @@ class TestSybilInputData:
             bmi=27.5,
             copd=0,
             education=3,
-            ethnicity=1,
+            ethnicity="White",
             family_lc_history=0,
             personal_cancer_history=1,
             smoking_duration=30.0,

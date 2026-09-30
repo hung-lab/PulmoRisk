@@ -127,7 +127,7 @@ def test_batch_sybil_row_parser_happy_path():
         "smoking_quit_time": "2",
         "copd": "1",
         "education": "3",
-        "ethnicity": "2",
+        "ethnicity": "Black",
         "family_lc_history": "0",
         "personal_cancer_history": "0",
         "smoking_status": "1",
@@ -142,6 +142,7 @@ def test_batch_sybil_row_parser_happy_path():
     assert result["smoking_duration"] == 10.0
     assert result["copd"] == 1
     assert result["education"] == 3
+    assert result["ethnicity"] == "Black"
     assert result["ct_scan_dir"] == "/tmp/scans"
     assert result["six_year_risk"] == 0.12
 

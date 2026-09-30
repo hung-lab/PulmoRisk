@@ -115,7 +115,6 @@ class BatchSybilRowParser:
     _INT_FIELDS = (
         "copd",
         "education",
-        "ethnicity",
         "family_lc_history",
         "personal_cancer_history",
         "smoking_status",
@@ -130,6 +129,10 @@ class BatchSybilRowParser:
 
         for f in cls._INT_FIELDS:
             out[f] = FieldParser.int(f, str(row.get(f, "")), f.replace("_", " "))
+
+        out["ethnicity"] = FieldParser.required_str(
+            "ethnicity", str(row.get("ethnicity", "")), "Ethnicity"
+        )
 
         out["ct_scan_dir"] = row.get("ct_scan_dir") or None
         out["six_year_risk"] = FieldParser.optional_float(

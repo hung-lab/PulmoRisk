@@ -172,7 +172,7 @@ Both models support CSV batch input. Pass a CSV file via the batch mode tab in t
 | `bmi` | Body mass index (kg/m²) |
 | `copd` | 0 or 1 |
 | `education` | 1–6 (NLST codes) |
-| `ethnicity` | 1 = White, 2 = Black, 3 = Asian, 4 = Other |
+| `ethnicity` | One of `White`, `Black`, `Asian`, `Others` |
 | `family_lc_history` | 0 or 1 |
 | `personal_cancer_history` | 0 or 1 |
 | `smoking_duration` | Years |

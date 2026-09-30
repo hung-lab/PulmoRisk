@@ -59,8 +59,8 @@ def _check_range(
 def _check_choice(
     errors: dict[str, str],
     field_name: str,
-    value: int | None,
-    choices: tuple[int, ...],
+    value: int | str | None,
+    choices: tuple[int, ...] | tuple[str, ...],
     label: str | None = None,
 ) -> None:
     display = label or field_name
@@ -85,7 +85,7 @@ class SybilInputData:
     bmi: float
     copd: int  # 0 or 1
     education: int  # 1-6 (NLST codes)
-    ethnicity: int  # 1-4 (NLST codes)
+    ethnicity: str  # "White" | "Black" | "Asian" | "Others"
     family_lc_history: int  # 0 or 1
     personal_cancer_history: int  # 0 or 1
     smoking_duration: float  # years
@@ -102,7 +102,13 @@ class SybilInputData:
         _check_range(errors, "bmi", self.bmi, 15, 50, "BMI")
         _check_choice(errors, "copd", self.copd, (0, 1), "COPD")
         _check_range(errors, "education", self.education, 1, 6, "Education")
-        _check_range(errors, "ethnicity", self.ethnicity, 1, 4, "Ethnicity")
+        _check_choice(
+            errors,
+            "ethnicity",
+            self.ethnicity,
+            ("White", "Black", "Asian", "Others"),
+            "Ethnicity",
+        )
         _check_choice(
             errors,
             "family_lc_history",
