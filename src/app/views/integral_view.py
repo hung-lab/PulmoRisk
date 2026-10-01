@@ -213,17 +213,17 @@ class IntegralView:
             text=(
                 "Upload a CSV containing individual metadata and CT scan image and mask files.\n\n"
                 "Required columns:\n"
-                "- image_file (Path to image (NRRD format))\n"
-                "- mask_file (Path to nodule mask (NRRD format))\n"
-                "- age (Years [0 - 100])\n"
+                "- image_file (Full path to image in NRRD format)\n"
+                "- mask_file (Full path to nodule mask in NRRD format)\n"
+                "- age (In years, 0 to 100)\n"
                 "- female (0 = male, 1 = female)\n"
-                "- bmi (Body mass index (kg/m^2) [15.0 - 50.0])\n"
-                "- fhlc (family lung cancer history: 0 or 1)\n"
-                "- copdemph (OPD / emphysema: 0 or 1)\n"
-                "- formersmk (former smoker: 0 or 1)\n"
-                "- duration (smoking duration (years) [0 - age])\n"
-                "- cigday (cigarettes per day [0 - 100])\n"
-                "- quittime (years since quitting [0 - age])\n\n"
+                "- bmi (Body mass index in kg/m^2, 0 to 100)\n"
+                "- fhlc (Family history of lung cancer, 0 = No, 1 = Yes)\n"
+                "- copdemph (Chronic obstructive pulmonary disease, 0 = No, 1 = Yes)\n"
+                "- formersmk (Former smoker, 0 = No, 1 = Yes)\n"
+                "- duration (Smoking duration, in years, 0 to 100)\n"
+                "- cigday (Cigarettes per day, 0 to 10000)\n"
+                "- quittime (Years since quitting, 0 to 100)\n"
             ),
             justify="left",
             anchor="w",
@@ -241,6 +241,44 @@ class IntegralView:
             padx=SECTION_GAP_BOTTOM,
             pady=(0, SPACE_MD),
         )
+
+        # ── Example CSV ────────────────────────────────────────────────────────
+
+        ctk.CTkLabel(
+            batch_card,
+            text="Example CSV",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(
+            anchor="w",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(SPACE_SM, SPACE_XS),
+        )
+
+        csv_example = (
+            "image_file,mask_file,age,female,bmi,fhlc,copdemph,formersmk,"
+            "duration,cigday,quittime\n"
+            "/data/patient_001/image.nrrd,/data/patient_001/mask.nrrd,"
+            "65,0,27.4,1,0,1,30,20,5\n"
+            "/data/patient_002/image.nrrd,/data/patient_002/mask.nrrd,"
+            "58,1,31.2,0,1,0,35,15,0\n"
+            "/data/patient_003/image.nrrd,/data/patient_003/mask.nrrd,"
+            "72,0,25.8,1,0,1,40,25,2"
+        )
+
+        example_box = ctk.CTkTextbox(
+            batch_card,
+            height=100,
+            font=ctk.CTkFont(family="Courier", size=11),
+        )
+
+        example_box.pack(
+            fill="x",
+            padx=SECTION_GAP_BOTTOM,
+            pady=(0, SPACE_SM),
+        )
+
+        example_box.insert("1.0", csv_example)
+        example_box.configure(state="disabled")
 
         # hidden initially
         self._batch_frame.pack_forget()

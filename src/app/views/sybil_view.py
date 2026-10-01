@@ -209,8 +209,21 @@ class SybilView:
         ctk.CTkLabel(
             batch_card,
             text=(
-                "Upload a CSV containing individual metadata and CT scan folder paths.\n"
-                "The CSV must contain the required Sybil-Epi input columns."
+                "Upload a CSV containing individual metadata and CT scan folder paths.\n\n"
+                "Required columns:\n"
+                "  - age (In years, 0 to 100)\n"
+                "  - bmi (Body mass index in kg/m^2, 0 to 100)\n"
+                "  - copd (Chronic obstructive pulmonary disease, 0 = No, 1 = Yes)\n"
+                "  - education (1 = Less than high school graduate, 2 = High school graduate, 3 = Some training after high school, 4 = Some college, 5 = College graduate, 6 = Postgraduate / professional degree)\n"
+                "  - ethnicity (White, Black, Asian, or Others)\n"
+                "  - family_lc_history (Family history of lung cancer, 0 = No, 1 = Yes)\n"
+                "  - personal_cancer_history (Personal history of any cancer, 0 = No, 1 = Yes)\n"
+                "  - smoking_duration (In years, 0 to 100)\n"
+                "  - smoking_intensity (In cigarettes per day, 0 to 10000)\n"
+                "  - smoking_quit_time (In years, 0 to 100)\n"
+                "  - smoking_status (0 = Not a current smoker, 1 = Current smoker)\n"
+                "  - ct_scan_dir (Full path of folder containing CT Scan in DICOM format). It is not required when six_year_risk is present.\n"
+                "  - six_year_risk (6-year Risk Sybil value, 0 to 1). It is not required when ct_scan_dir is present.\n"
             ),
             justify="left",
             anchor="w",
@@ -265,69 +278,6 @@ class SybilView:
 
         example_box.insert("1.0", csv_example)
         example_box.configure(state="disabled")
-
-        ctk.CTkLabel(
-            batch_card,
-            text=(
-                "Education: 1-6  •  Ethnicity: White, Black, Asian, Others  •  "
-                "Yes/No fields: 0 = No, 1 = Yes"
-            ),
-            text_color=("gray40", "gray70"),
-            justify="left",
-        ).pack(
-            anchor="w",
-            padx=SECTION_GAP_BOTTOM,
-            pady=(0, SPACE_MD),
-        )
-
-        # ── Value mappings ─────────────────────────────────────────────────────
-
-        mapping_frame = ctk.CTkFrame(
-            batch_card,
-            fg_color="transparent",
-            border_width=0,
-        )
-        mapping_frame.pack(
-            fill="x",
-            padx=SECTION_GAP_BOTTOM,
-            pady=(SPACE_SM, SPACE_MD),
-        )
-
-        mapping_frame.grid_columnconfigure(0, weight=1)
-        mapping_frame.grid_columnconfigure(1, weight=1)
-
-        # Education
-        education_frame = ctk.CTkFrame(
-            mapping_frame,
-            fg_color="transparent",
-            border_width=0,
-        )
-        education_frame.grid(
-            row=0,
-            column=0,
-            sticky="nw",
-            padx=(0, SPACE_MD),
-        )
-
-        ctk.CTkLabel(
-            education_frame,
-            text="Education",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", pady=(0, SPACE_XS))
-
-        ctk.CTkLabel(
-            education_frame,
-            text=(
-                "1 = Less than high school graduate\n"
-                "2 = High school graduate\n"
-                "3 = Some training after high school\n"
-                "4 = Some college\n"
-                "5 = College graduate\n"
-                "6 = Postgraduate / professional degree"
-            ),
-            justify="left",
-            anchor="w",
-        ).pack(anchor="w")
 
         # hidden initially
         self._batch_frame.pack_forget()
