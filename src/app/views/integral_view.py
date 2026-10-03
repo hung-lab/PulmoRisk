@@ -820,7 +820,7 @@ class IntegralView:
         # ───────────────────────────── RESULT ───────────────────────────────
         elif event.type == "radiomics_result":
             if isinstance(event.data, dict) and "output_path" in event.data:
-                self._show_results(f"Batch complete:\n{event.data['output_path']}")
+                self._show_results(f"Batch complete. Results saved in:\n{event.data['output_path']}")
 
             elif not event.data or "probability" not in event.data:
                 return

@@ -858,7 +858,7 @@ class SybilView:
 
         elif event.type == "sybil_result":
             if isinstance(event.data, dict) and "output_path" in event.data:
-                self._show_results(f"Batch complete:\n{event.data['output_path']}")
+                self._show_results(f"Batch complete. Results saved in:\n{event.data['output_path']}")
                 self._hide_overlay()
             elif event.data:
                 # yearly = event.data.get("yearly", [])

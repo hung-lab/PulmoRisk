@@ -8,7 +8,7 @@ from typing import TypeAlias
 import pandas as pd
 
 from app.models.individual_model import IntegralClinicalData
-from app.utils.helpers import find_rscript
+from app.utils.helpers import clean_r_subprocess_env, find_rscript
 
 prediction: TypeAlias = tuple[float, float]
 
@@ -65,27 +65,41 @@ def run_inference_pipeline(individual: IntegralClinicalData) -> prediction:
         )
         df.to_csv(tmp_csv, index=False)
 
+        # Windows backslashes are escape characters in an R string literal —
+        # embedding the raw path corrupts it (and has crashed the R process
+        # outright rather than raising a clean error).
+        r_path = str(tmp_csv).replace("\\", "/")
+
         # R code to predict and output JSON
         r_code = f"""
         .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
         library(integralrad)
         library(jsonlite)
 
-        preds <- predict_integral_radiomics("{tmp_csv}")
+        preds <- predict_integral_radiomics("{r_path}")
         cat(toJSON(preds, dataframe="rows"))
         """
 
         # jsonlite::toJSON(result) pred_benign and pred_malignant
 
+        # Passing R code via `-e` on the command line crashes the R process
+        # outright (access violation) once integralrad spawns its own
+        # reticulate/uv subprocess — writing it to a script file and running
+        # that instead avoids whatever Windows argv quirk causes this.
+        script_file = Path(tempfile.gettempdir()) / f"{tmp_csv.stem}_predict.R"
+        script_file.write_text(r_code, encoding="utf-8")
+
         env = os.environ.copy()
         env["R_LIBS_USER"] = str(Path.home() / ".pulmorisk" / "r" / "library")
+        env = clean_r_subprocess_env(env)
 
         rscript_path = find_rscript()
 
         # Run R subprocess
         result = subprocess.run(  # nosec B603
-            [rscript_path, "-e", r_code],
+            [rscript_path, "--vanilla", str(script_file)],
             env=env,
+            cwd=tempfile.gettempdir(),
             capture_output=True,
             text=True,
             check=True,
@@ -122,3 +136,5 @@ def run_inference_pipeline(individual: IntegralClinicalData) -> prediction:
     finally:
         if tmp_csv.exists():
             tmp_csv.unlink()
+        if "script_file" in locals() and script_file.exists():
+            script_file.unlink()

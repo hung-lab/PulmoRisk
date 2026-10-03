@@ -15,6 +15,7 @@ from app.models.individual_model import IntegralClinicalData
 from app.utils.event_bus import AppEvent
 from app.utils.helpers import (
     InvalidFileError,
+    clean_r_subprocess_env,
     find_rscript,
     format_percent,
     validate_file_path,
@@ -105,7 +106,13 @@ class IntegralController(BaseController):
             cat(toJSON(preds, dataframe="rows"))
             """
 
-            # jsonlite::toJSON(result) pred_benign and pred_malignant
+            # Passing R code via `-e` on the command line crashes the R
+            # process outright (access violation) once integralrad spawns
+            # its own reticulate/uv subprocess — writing it to a script file
+            # and running that instead avoids whatever Windows argv quirk
+            # causes this.
+            script_file = Path(tempfile.gettempdir()) / f"{tmp_csv.stem}_predict.R"
+            script_file.write_text(r_code, encoding="utf-8")
 
             self._log("Calling integral-radiomics R library via Rscript...")
             self._log(
@@ -126,13 +133,15 @@ class IntegralController(BaseController):
 
             env = os.environ.copy()
             env["R_LIBS_USER"] = str(Path.home() / ".pulmorisk" / "r" / "library")
+            env = clean_r_subprocess_env(env)
 
             rscript_path = find_rscript()
 
             # Run R subprocess
             result = subprocess.run(  # nosec B603
-                [rscript_path, "-e", r_code],
+                [rscript_path, "--vanilla", str(script_file)],
                 env=env,
+                cwd=tempfile.gettempdir(),
                 capture_output=True,
                 text=True,
                 check=True,
@@ -171,6 +180,8 @@ class IntegralController(BaseController):
         finally:
             if "tmp_csv" in locals() and tmp_csv.exists():
                 tmp_csv.unlink()
+            if "script_file" in locals() and script_file.exists():
+                script_file.unlink()
 
     # ─────────────────────────────── DATA PREP ─────────────────────────
 

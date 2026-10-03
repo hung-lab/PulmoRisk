@@ -126,6 +126,32 @@ def validate_file_path(path: Path, field_name: str) -> None:
         raise InvalidFileError(field_name, "not a nrrd file")
 
 
+def clean_r_subprocess_env(env: dict[str, str]) -> dict[str, str]:
+    """Strip Python-venv pollution that breaks reticulate inside R.
+
+    ``reticulate`` (used by integralrad to call PyRadiomics) auto-detects an
+    active Python virtualenv two ways: a VIRTUAL_ENV env var inherited from
+    the launching shell (e.g. VS Code auto-activating a project's .venv), or
+    that venv's Scripts/bin directory sitting on PATH. Either one silently
+    hijacks integralrad's own reticulate-managed Python provisioning and
+    crashes the R process with an access violation. Combined with running
+    the subprocess from a neutral cwd (so reticulate's separate "a .venv/
+    folder exists in the current directory" check doesn't also trigger),
+    this lets R always get its own clean, self-provisioned Python.
+    """
+    env = dict(env)
+    for var in ("VIRTUAL_ENV", "PYTHONHOME", "CONDA_PREFIX", "RETICULATE_PYTHON"):
+        env.pop(var, None)
+
+    path_entries = env.get("PATH", "").split(os.pathsep)
+    env["PATH"] = os.pathsep.join(
+        p
+        for p in path_entries
+        if ".venv" not in p.lower().replace("\\", "/").split("/")
+    )
+    return env
+
+
 def r_package_installed(rscript: str, package: str) -> bool:
     r_lib = str(Path.home() / ".pulmorisk" / "r" / "library")
     r_code = (

@@ -13,6 +13,7 @@ import customtkinter as ctk
 from app.controllers.base_controller import BaseController
 from app.utils.event_bus import AppEvent, EventBus
 from app.utils.helpers import (
+    clean_r_subprocess_env,
     find_integral_cli,
     find_rscript,
     r_package_installed,
@@ -320,11 +321,13 @@ cat("integralrad OK\\n")
             # Add ~/.local/bin without assuming Unix ':' separators.
             user_bin = Path.home() / ".local" / "bin"
             env["PATH"] = f"{user_bin}{os.pathsep}{env.get('PATH', '')}"
+            env = clean_r_subprocess_env(env)
 
             try:
                 result = subprocess.run(  # nosec B603
                     [rscript_path, "--vanilla", str(script_path)],
                     env=env,
+                    cwd=tempfile.gettempdir(),
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
