@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.14](https://github.com/hung-lab/PulmoRisk/compare/v1.4.13...v1.4.14) (2026-10-03)
+
+
+### Bug Fixes
+
+* Add instruction on how to solve issue when RTools are missing. ([b1e0067](https://github.com/hung-lab/PulmoRisk/commit/b1e00675141e9b811f9f059e4371cf342f6d1c72))
+* make the text in the batch processing section more detailed. ([3c15cd2](https://github.com/hung-lab/PulmoRisk/commit/3c15cd22cd185c861954f66919a9b98ba68a3b2d))
+* Modify message to indicate where results were saved. Fix crash in INTEGRAL-Radiomics caused by Python venv interference and R subprocess invocation. ([568f78b](https://github.com/hung-lab/PulmoRisk/commit/568f78b43a2571bb92b592bd5e068a758fcd4e3c))
+* Modify visual aspect of yes/no buttons. Add radio buttons to Sybil-Epi ct folder vs value. Handle ethnicity as a string and not as numerical values. Do not move the Sybil-Epi result to the top when switching from single to batch mode. ([ad3f84d](https://github.com/hung-lab/PulmoRisk/commit/ad3f84d5285cbb492210f5e5f919b04d03b8a766))
+
 ## [1.4.13](https://github.com/hung-lab/PulmoRisk/compare/v1.4.12...v1.4.13) (2026-09-29)
 
 
