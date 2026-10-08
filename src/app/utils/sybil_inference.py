@@ -17,6 +17,12 @@ def run_sybil_pipeline(model, individual) -> float:
     - deterministic output
     """
 
+    # A precomputed 6-year Sybil score skips CT inference entirely — mirrors
+    # SybilController.run()'s single-individual branch.
+    if individual.six_year_risk is not None:
+        epi_in = epi_input_from_individual_data(individual, individual.six_year_risk)
+        return calculate_sybil_epi_score(epi_in)
+
     path = Path(individual.ct_scan_dir)
 
     if not path.exists():

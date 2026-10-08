@@ -23,6 +23,7 @@ Typical usage in a view::
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
@@ -97,6 +98,20 @@ class FieldParser:
 # ---------------------------------------------------------------------------
 
 
+def _cell(row: dict, field: str) -> str:
+    """Read a raw CSV cell as a string, treating a blank/missing cell as "".
+
+    pandas represents an empty CSV cell as the float ``nan``, not an empty
+    string — ``row.get(field, "")``'s default never applies since the key
+    is present, and ``str(nan)`` is the non-empty string ``"nan"``, which
+    would otherwise parse as a literal number instead of "field not given".
+    """
+    value = row.get(field, "")
+    if isinstance(value, float) and math.isnan(value):
+        return ""
+    return str(value)
+
+
 class BatchSybilRowParser:
     """Coerce a CSV row (dict of strings) to typed values for SybilInputData.
 
@@ -125,18 +140,18 @@ class BatchSybilRowParser:
         out: dict = {}
 
         for f in cls._FLOAT_FIELDS:
-            out[f] = FieldParser.float(f, str(row.get(f, "")), f.replace("_", " "))
+            out[f] = FieldParser.float(f, _cell(row, f), f.replace("_", " "))
 
         for f in cls._INT_FIELDS:
-            out[f] = FieldParser.int(f, str(row.get(f, "")), f.replace("_", " "))
+            out[f] = FieldParser.int(f, _cell(row, f), f.replace("_", " "))
 
         out["ethnicity"] = FieldParser.required_str(
-            "ethnicity", str(row.get("ethnicity", "")), "Ethnicity"
+            "ethnicity", _cell(row, "ethnicity"), "Ethnicity"
         )
 
-        out["ct_scan_dir"] = row.get("ct_scan_dir") or None
+        out["ct_scan_dir"] = _cell(row, "ct_scan_dir") or None
         out["six_year_risk"] = FieldParser.optional_float(
-            "six_year_risk", str(row.get("six_year_risk", ""))
+            "six_year_risk", _cell(row, "six_year_risk")
         )
 
         return out
@@ -167,12 +182,12 @@ class BatchIntegralRowParser:
         out: dict = {}
 
         for f in cls._FLOAT_FIELDS:
-            out[f] = FieldParser.float(f, str(row.get(f, "")), f.replace("_", " "))
+            out[f] = FieldParser.float(f, _cell(row, f), f.replace("_", " "))
 
         for f in cls._INT_FIELDS:
-            out[f] = FieldParser.int(f, str(row.get(f, "")), f.replace("_", " "))
+            out[f] = FieldParser.int(f, _cell(row, f), f.replace("_", " "))
 
-        out["image_file"] = row.get("image_file") or None
-        out["mask_file"] = row.get("mask_file") or None
+        out["image_file"] = _cell(row, "image_file") or None
+        out["mask_file"] = _cell(row, "mask_file") or None
 
         return out

@@ -147,6 +147,58 @@ def test_batch_sybil_row_parser_happy_path():
     assert result["six_year_risk"] == 0.12
 
 
+def test_batch_sybil_row_parser_blank_cell_is_nan_not_string():
+    """pandas represents a blank CSV cell as float('nan'), not "" — a
+    ct_scan_dir row's blank six_year_risk cell must parse as None, not as
+    the literal number NaN (which used to fail "must be between 0 and 1")."""
+    row = {
+        "age": 50,
+        "bmi": 22.5,
+        "smoking_duration": 10,
+        "smoking_intensity": 5,
+        "smoking_quit_time": 2,
+        "copd": 1,
+        "education": 3,
+        "ethnicity": "Black",
+        "family_lc_history": 0,
+        "personal_cancer_history": 0,
+        "smoking_status": 1,
+        "ct_scan_dir": "/tmp/scans",
+        "six_year_risk": float("nan"),
+    }
+
+    result = BatchSybilRowParser.parse(row)
+
+    assert result["ct_scan_dir"] == "/tmp/scans"
+    assert result["six_year_risk"] is None
+
+
+def test_batch_sybil_row_parser_blank_ct_scan_dir_is_none_not_nan():
+    """A six-year-risk row's blank ct_scan_dir cell (pandas NaN) must parse
+    as None — "nan or None" previously kept the float NaN since NaN is
+    truthy in Python."""
+    row = {
+        "age": 50,
+        "bmi": 22.5,
+        "smoking_duration": 10,
+        "smoking_intensity": 5,
+        "smoking_quit_time": 2,
+        "copd": 1,
+        "education": 3,
+        "ethnicity": "Black",
+        "family_lc_history": 0,
+        "personal_cancer_history": 0,
+        "smoking_status": 1,
+        "ct_scan_dir": float("nan"),
+        "six_year_risk": 0.12,
+    }
+
+    result = BatchSybilRowParser.parse(row)
+
+    assert result["ct_scan_dir"] is None
+    assert result["six_year_risk"] == 0.12
+
+
 def test_batch_sybil_row_parser_missing_required_field():
     row = {
         "age": "abc",  # invalid float

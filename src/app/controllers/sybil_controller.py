@@ -217,18 +217,17 @@ class SybilController(BaseController):
                 try:
                     individual = self._row_to_individual(row)
 
-                    path = Path(individual.ct_scan_dir)
-
-                    ok, msg = validate_ct_path(path)
-                    if not ok:
-                        self._warn(f"Row {i + 1} skipped: {msg}")
-                        results.append(
-                            {
-                                "epi": None,
-                                "error": msg,
-                            }
-                        )
-                        continue
+                    if individual.six_year_risk is None:
+                        ok, msg = validate_ct_path(Path(individual.ct_scan_dir))
+                        if not ok:
+                            self._warn(f"Row {i + 1} skipped: {msg}")
+                            results.append(
+                                {
+                                    "epi": None,
+                                    "error": msg,
+                                }
+                            )
+                            continue
 
                     self._log(f"Running inference on row {i + 1} for individual: ")
                     self._log(json.dumps(asdict(individual)))
