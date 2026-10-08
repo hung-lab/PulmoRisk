@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.15](https://github.com/hung-lab/PulmoRisk/compare/v1.4.14...v1.4.15) (2026-10-08)
+
+
+### Bug Fixes
+
+* Handle case when ct folder or sybil value columns are empty. ([33a1d60](https://github.com/hung-lab/PulmoRisk/commit/33a1d60e31003eb1887c29d4a73f6618cd87cc5c))
+
 ## [1.4.14](https://github.com/hung-lab/PulmoRisk/compare/v1.4.13...v1.4.14) (2026-10-03)
 
 
