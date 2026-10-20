@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/hung-lab/PulmoRisk/compare/v1.4.15...v1.5.0) (2026-10-20)
+
+
+### Features
+
+* Allow the user to point to a DICOM folder with more than one series for Sybil-Epi. Show the available series in the single option or choose the series with the most slices in the batch option. ([0bb8479](https://github.com/hung-lab/PulmoRisk/commit/0bb84794237e98b315fd3348342689b40be436e8))
+
+
+### Bug Fixes
+
+* Forgot to add dicom_series.py file. ([67c40a3](https://github.com/hung-lab/PulmoRisk/commit/67c40a30b2bdaef133d4e754236fafa58ad4e7f6))
+
 ## [1.4.15](https://github.com/hung-lab/PulmoRisk/compare/v1.4.14...v1.4.15) (2026-10-08)
 
 
