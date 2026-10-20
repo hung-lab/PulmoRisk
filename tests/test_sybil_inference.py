@@ -1,8 +1,11 @@
 """Tests for run_sybil_pipeline's CT-folder vs precomputed-risk branching."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from app.models.individual_model import SybilInputData
+from app.utils.dicom_series import DicomSeries
 from app.utils.sybil_inference import run_sybil_pipeline
 
 
@@ -29,15 +32,16 @@ class TestPrecomputedRiskSkipsCtInference:
         individual = SybilInputData(
             **base_patient_kwargs, ct_scan_dir=None, six_year_risk=0.05
         )
-        score = run_sybil_pipeline(None, individual)
+        score, series_label = run_sybil_pipeline(None, individual)
         assert 0.0 < score < 1.0
+        assert series_label is None
 
     def test_higher_precomputed_risk_scores_higher(self, base_patient_kwargs):
-        low = run_sybil_pipeline(
+        low, _ = run_sybil_pipeline(
             None,
             SybilInputData(**base_patient_kwargs, ct_scan_dir=None, six_year_risk=0.01),
         )
-        high = run_sybil_pipeline(
+        high, _ = run_sybil_pipeline(
             None,
             SybilInputData(**base_patient_kwargs, ct_scan_dir=None, six_year_risk=0.9),
         )
@@ -60,3 +64,38 @@ class TestCtFolderModeStillValidatesPath:
         )
         with pytest.raises(ValueError, match="No files found"):
             run_sybil_pipeline(None, individual)
+
+
+class TestMultiSeriesAutoSelection:
+    """A multi-series folder picks the series with the most slices, with
+    no UI to ask — batch mode has no user to prompt."""
+
+    def test_picks_series_with_most_slices(self, base_patient_kwargs, tmp_path):
+        small = DicomSeries(
+            series_uid="1", description="Small series", series_number=1,
+            files=["a.dcm", "b.dcm"],
+        )
+        large = DicomSeries(
+            series_uid="2", description="Large series", series_number=2,
+            files=["c.dcm", "d.dcm", "e.dcm"],
+        )
+
+        individual = SybilInputData(
+            **base_patient_kwargs, ct_scan_dir=str(tmp_path), six_year_risk=None
+        )
+
+        mock_model = MagicMock()
+        mock_model.predict.return_value.scores = [[0.1, 0.1, 0.1, 0.1, 0.1, 0.05]]
+
+        with (
+            patch(
+                "app.utils.sybil_inference.find_dicom_series",
+                return_value=[small, large],
+            ),
+            patch("app.utils.sybil_inference.Serie") as mock_serie,
+        ):
+            score, series_label = run_sybil_pipeline(mock_model, individual)
+
+        mock_serie.assert_called_once_with(large.files)
+        assert series_label == "Large series - 3 slices"
+        assert 0.0 < score < 1.0

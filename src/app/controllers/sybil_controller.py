@@ -75,7 +75,7 @@ class SybilController(BaseController):
 
         threading.Thread(target=_task, daemon=True).start()
 
-    def run(self, data) -> None:
+    def run(self, data, dicom_files: list[str] | None = None) -> None:
         if data.six_year_risk:
             self._pending = data
             self._set_state("running")
@@ -91,12 +91,18 @@ class SybilController(BaseController):
                 self._error("Model not loaded.")
                 return
 
-            path = Path(data.ct_scan_dir)
-            if not path.is_dir():
-                self._error("Invalid CT folder.")
-                return
+            if dicom_files:
+                # A specific series was already picked (the folder contains
+                # more than one) — use exactly those files, not a fresh scan.
+                dicoms = dicom_files
+            else:
+                path = Path(data.ct_scan_dir)
+                if not path.is_dir():
+                    self._error("Invalid CT folder.")
+                    return
 
-            dicoms = sorted(path.glob("*.*"))
+                dicoms = sorted(str(f) for f in path.glob("*.*"))
+
             if not dicoms:
                 self._error("No files found.")
                 return
@@ -109,7 +115,7 @@ class SybilController(BaseController):
             self._infer_active = True
             threading.Thread(
                 target=self._infer,
-                args=([str(f) for f in dicoms],),
+                args=(list(dicoms),),
                 daemon=True,
             ).start()
             threading.Thread(target=self._heartbeat, daemon=True).start()
@@ -210,7 +216,10 @@ class SybilController(BaseController):
                     remaining = total - len(results)
 
                     results.extend(
-                        [{"epi": None, "error": "cancelled"} for _ in range(remaining)]
+                        [
+                            {"epi": None, "ct_series_selected": None, "error": "cancelled"}
+                            for _ in range(remaining)
+                        ]
                     )
                     break
 
@@ -224,6 +233,7 @@ class SybilController(BaseController):
                             results.append(
                                 {
                                     "epi": None,
+                                    "ct_series_selected": None,
                                     "error": msg,
                                 }
                             )
@@ -232,11 +242,14 @@ class SybilController(BaseController):
                     self._log(f"Running inference on row {i + 1} for individual: ")
                     self._log(json.dumps(asdict(individual)))
 
-                    epi = run_sybil_pipeline(self._model, individual)
+                    epi, series_label = run_sybil_pipeline(self._model, individual)
+                    if series_label:
+                        self._log(f"Row {i + 1}: using CT series \"{series_label}\"")
 
                     results.append(
                         {
                             "epi": epi,
+                            "ct_series_selected": series_label,
                             "error": None,
                         }
                     )
@@ -247,11 +260,13 @@ class SybilController(BaseController):
                     results.append(
                         {
                             "epi": None,
+                            "ct_series_selected": None,
                             "error": str(e),
                         }
                     )
 
             df["epi_risk"] = [r["epi"] for r in results]
+            df["ct_series_selected"] = [r["ct_series_selected"] for r in results]
             df["error"] = [r["error"] for r in results]
 
             output_path = str(Path(csv_path).with_suffix(""))

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,7 @@ from app.config.settings import (
     WARNING_COLOUR_HOVER,
 )
 from app.models.individual_model import ModelValidationError, SybilInputData
+from app.utils.dicom_series import find_dicom_series
 from app.utils.event_bus import AppEvent
 from app.utils.ui_config import (
     BUTTON_GAP,
@@ -85,6 +87,11 @@ class SybilView:
         self._ct_dir_var = tk.StringVar(value="No folder selected")
         self._six_year_risk = tk.StringVar()
         self._ct_input_mode_var = tk.StringVar(value="ct")
+
+        # ── CT series disambiguation (folder has more than one series) ────
+        self._series_var = tk.StringVar()
+        self._series_options: dict[str, list[str]] = {}
+        self._selected_series_files: list[str] | None = None
 
         # ── validation error vars ─────────────────────────────────────────
         self._age_error_var = tk.StringVar()
@@ -432,16 +439,58 @@ class SybilView:
         )
         self._ct_browse_btn.pack(anchor="w", pady=(SPACE_XS, 0))
 
+        # Series picker — only shown while CT Scan Folder is the active mode
+        # AND the selected folder contains more than one DICOM series (e.g.
+        # contrast + non-contrast acquisitions). Built here, directly below
+        # the CT Scan Folder row, so it must be packed with before=err_row —
+        # otherwise a forget()/pack() cycle re-appends it at the bottom of
+        # the card instead of leaving it in place.
+        self._series_note_row = self._row(p)
+        ctk.CTkLabel(
+            self._series_note_row,
+            text=(
+                "More than one CT series was found in the selected folder. "
+                "Please, select one for the analysis."
+            ),
+            font=ctk.CTkFont(size=12, slant="italic"),
+            anchor="w",
+            justify="left",
+        ).grid(row=0, column=0, columnspan=2, sticky="w")
+
+        self._series_row = self._row(p)
+        self._label(self._series_row, "CT Series")
+
+        series_container = ctk.CTkFrame(
+            self._series_row,
+            width=INPUT_WIDTH,
+            fg_color="transparent",
+            border_width=0,
+        )
+        series_container.grid(row=0, column=1, sticky="w")
+        series_container.grid_propagate(False)
+
+        self._series_combo = ctk.CTkComboBox(
+            series_container,
+            variable=self._series_var,
+            values=[],
+            state="readonly",
+            command=self._on_series_selected,
+        )
+        self._series_combo.pack(fill="both", expand=True)
+
         # Error row
-        err_row = self._row(p)
+        self._ct_err_row = self._row(p)
 
         error = ctk.CTkLabel(
-            err_row,
+            self._ct_err_row,
             textvariable=self._ct_error_var,
             text_color=ERROR_COLOUR,
             font=ctk.CTkFont(size=12),
         )
         error.grid(row=0, column=1, sticky="w", pady=(SPACE_XS, 0))
+
+        self._series_note_row.pack_forget()
+        self._series_row.pack_forget()  # hidden until a multi-series folder is picked
 
         # ── 6-year Sybil risk (mutually exclusive with the CT folder) ──────
         risk_row = self._row(p)
@@ -495,6 +544,19 @@ class SybilView:
         else:
             self._ct_dir_var.set("No folder selected")
             self._ct_error_var.set("")
+
+        self._update_series_picker_visibility()
+
+    def _update_series_picker_visibility(self) -> None:
+        """Series note + combo show only in CT mode with >1 series found."""
+        if self._ct_input_mode_var.get() == "ct" and len(self._series_options) > 1:
+            self._series_note_row.pack(
+                fill="x", pady=SPACE_XS, before=self._ct_err_row
+            )
+            self._series_row.pack(fill="x", pady=SPACE_XS, before=self._ct_err_row)
+        else:
+            self._series_note_row.pack_forget()
+            self._series_row.pack_forget()
 
     # ─────────────────────────────── WIDGET FACTORIES ────────────────────
 
@@ -582,6 +644,8 @@ class SybilView:
         # Re-apply CT/risk mutual exclusivity — the blanket re-enable above
         # would otherwise also re-enable the currently-inactive field.
         self._on_ct_input_mode_change()
+        # ... and the series combo must stay pick-from-list, not editable.
+        self._series_combo.configure(state="readonly")
 
     def _set_widgets_state(self, state: str) -> None:
         """Recursively enable/disable all input widgets in the form."""
@@ -594,6 +658,7 @@ class SybilView:
                 ctk.CTkOptionMenu,
                 ctk.CTkCheckBox,
                 ctk.CTkRadioButton,
+                ctk.CTkComboBox,
             )
             if isinstance(widget, with_state):
                 with contextlib.suppress(Exception):
@@ -611,6 +676,41 @@ class SybilView:
             self._ct_dir_var.set(folder)
             self._ct_error_var.set("")
             self._emit("log", f"Selected CT folder: {folder}")
+            self._refresh_series_options(folder)
+
+    def _refresh_series_options(self, folder: str) -> None:
+        """Show a series picker if the folder has more than one DICOM series."""
+        self._series_options = {}
+        self._selected_series_files = None
+
+        series_list = find_dicom_series(Path(folder))
+
+        if len(series_list) <= 1:
+            self._update_series_picker_visibility()
+            return
+
+        self._series_options = {s.label: s.files for s in series_list}
+        labels = list(self._series_options)
+
+        # Default to the series with the most slices — the most likely
+        # candidate for a full-volume Sybil analysis.
+        default_label = max(series_list, key=lambda s: s.slice_count).label
+
+        self._series_combo.configure(values=labels)
+        self._series_var.set(default_label)
+        self._selected_series_files = self._series_options[default_label]
+
+        self._update_series_picker_visibility()
+        self._emit(
+            "log",
+            f"Folder contains {len(series_list)} series — "
+            f"using \"{default_label}\" (change it in the CT Series dropdown).",
+            "WARNING",
+        )
+
+    def _on_series_selected(self, choice: str) -> None:
+        self._selected_series_files = self._series_options.get(choice)
+        self._emit("log", f"Selected CT series: {choice}")
 
     def _on_submit(self) -> None:
         if self._running:
@@ -624,7 +724,7 @@ class SybilView:
             self._emit("log", str(exc), "ERROR")
             return
 
-        self.controller.run(data)
+        self.controller.run(data, dicom_files=self._selected_series_files)
 
     def _on_batch_submit(self) -> None:
         if self._running:
@@ -686,7 +786,11 @@ class SybilView:
         self._ct_dir_var.set("No folder selected")
         self._six_year_risk.set("")
         self._ct_input_mode_var.set("ct")
-        self._on_ct_input_mode_change()
+        self._series_options = {}
+        self._selected_series_files = None
+        self._series_var.set("")
+        self._series_combo.configure(values=[])
+        self._on_ct_input_mode_change()  # also hides the series picker
         self._clear_errors()
         self._results_frame.pack_forget()
 
