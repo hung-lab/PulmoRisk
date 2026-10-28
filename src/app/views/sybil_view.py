@@ -41,6 +41,8 @@ if TYPE_CHECKING:
 
 # ── Option maps (display label → integer code stored in SybilInputData) ──────
 
+NOT_AVAILABLE = "Not available"
+
 EDUCATION_OPTIONS: dict[str, int] = {
     "1 - Less than high school graduate": 1,
     "2 - High school graduate": 2,
@@ -55,6 +57,24 @@ ETHNICITY_OPTIONS: dict[str, str] = {
     "Black": "Black",
     "White": "White",
     "Others": "Others",
+}
+
+# Shared by every tri-state Yes/No field (COPD, family history, personal
+# cancer history, current smoker).
+YES_NO_OPTIONS: dict[str, int] = {"No": 0, "Yes": 1}
+
+_FIELD_DISPLAY_NAMES: dict[str, str] = {
+    "age": "Age",
+    "bmi": "BMI",
+    "smoking_duration": "Smoking duration",
+    "smoking_intensity": "Smoking intensity",
+    "smoking_quit_time": "Smoking quit time",
+    "education": "Education",
+    "ethnicity": "Ethnicity",
+    "copd": "COPD",
+    "family_lc_history": "Family history of lung cancer",
+    "personal_cancer_history": "Personal history of any cancer",
+    "smoking_status": "Current smoker",
 }
 
 # Overlay stage labels keyed by the log messages the controller emits.
@@ -75,18 +95,22 @@ class SybilView:
         # ── form state vars ───────────────────────────────────────────────
         self._age_var = tk.StringVar()
         self._bmi_var = tk.StringVar()
-        self._copd_var = tk.BooleanVar(value=False)
-        self._education_var = tk.StringVar(value=next(iter(EDUCATION_OPTIONS)))
-        self._ethnicity_var = tk.StringVar(value=next(iter(ETHNICITY_OPTIONS)))
-        self._family_lc_var = tk.BooleanVar(value=False)
-        self._personal_cancer_var = tk.BooleanVar(value=False)
+        self._copd_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._education_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._ethnicity_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._family_lc_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._personal_cancer_var = tk.StringVar(value=NOT_AVAILABLE)
         self._smoking_duration_var = tk.StringVar()
         self._smoking_intensity_var = tk.StringVar()
         self._smoking_quit_time_var = tk.StringVar()
-        self._smoking_status_var = tk.BooleanVar(value=False)
+        self._smoking_status_var = tk.StringVar(value=NOT_AVAILABLE)
         self._ct_dir_var = tk.StringVar(value="No folder selected")
         self._six_year_risk = tk.StringVar()
         self._ct_input_mode_var = tk.StringVar(value="ct")
+
+        # ── "exactly one field may be missing" support ─────────────────────
+        self._ambiguous_field: str | None = None
+        self._ambiguous_values: dict[str, int | str] | None = None
 
         # ── CT series disambiguation (folder has more than one series) ────
         self._series_var = tk.StringVar()
@@ -317,13 +341,29 @@ class SybilView:
         )
         bottom.grid_columnconfigure(0, weight=1)
 
+        # General validation error (e.g. more than one field left blank) —
+        # placed outside the scrollable form so it's always visible without
+        # needing the Activity Log panel open.
+        self._general_error_var = tk.StringVar()
+        self._general_error_label = ctk.CTkLabel(
+            bottom,
+            textvariable=self._general_error_var,
+            text_color=ERROR_COLOUR,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            wraplength=600,
+            justify="left",
+            anchor="w",
+        )
+        self._general_error_label.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_XS))
+        self._general_error_label.grid_remove()
+
         self.run_button = ctk.CTkButton(
             bottom,
             text="Run Sybil-Epi",
             height=44,
             command=self._on_submit,
         )
-        self.run_button.grid(row=0, column=0, sticky="ew")
+        self.run_button.grid(row=1, column=0, sticky="ew")
 
         # ── overlay (lifted during a run) ────────────────────────────────
         self._overlay = RunningOverlay(self.root)
@@ -364,16 +404,20 @@ class SybilView:
     def _build_individual(self, p: ctk.CTkFrame) -> None:
         self._entry(p, "age", "Age (years)", self._age_var, self._age_error_var)
         self._entry(p, "bmi", "BMI (kg/m2)", self._bmi_var, self._bmi_error_var)
-        self._dropdown(p, "Education", self._education_var, list(EDUCATION_OPTIONS))
-        self._dropdown(p, "Ethnicity", self._ethnicity_var, list(ETHNICITY_OPTIONS))
+        self._dropdown(
+            p, "Education", self._education_var, [NOT_AVAILABLE, *EDUCATION_OPTIONS]
+        )
+        self._dropdown(
+            p, "Ethnicity", self._ethnicity_var, [NOT_AVAILABLE, *ETHNICITY_OPTIONS]
+        )
 
     def _build_history(self, p: ctk.CTkFrame) -> None:
-        self._checkbox(p, "COPD", self._copd_var)
-        self._checkbox(p, "Family history of lung cancer", self._family_lc_var)
-        self._checkbox(p, "Personal history of any cancer", self._personal_cancer_var)
+        self._tri_state(p, "COPD", self._copd_var)
+        self._tri_state(p, "Family history of lung cancer", self._family_lc_var)
+        self._tri_state(p, "Personal history of any cancer", self._personal_cancer_var)
 
     def _build_smoking(self, p: ctk.CTkFrame) -> None:
-        self._checkbox(p, "Current smoker", self._smoking_status_var)
+        self._tri_state(p, "Current smoker", self._smoking_status_var)
         self._entry(
             p,
             "smoking_duration",
@@ -593,17 +637,15 @@ class SybilView:
 
         return entry
 
-    def _checkbox(self, parent: ctk.CTkFrame, label: str, var: tk.BooleanVar) -> None:
+    def _tri_state(self, parent: ctk.CTkFrame, label: str, var: tk.StringVar) -> None:
+        """A No / Yes / Not available selector — defaults to Not available."""
         r = self._row(parent)
         self._label(r, label)
 
-        checkbox = ctk.CTkCheckBox(r, text="0 - No", variable=var)
-        checkbox.grid(row=0, column=1, sticky="w")
-
-        def _update_text(*_args):
-            checkbox.configure(text="1 - Yes" if var.get() else "0 - No")
-
-        var.trace_add("write", _update_text)
+        segmented = ctk.CTkSegmentedButton(
+            r, values=[NOT_AVAILABLE, "No", "Yes"], variable=var
+        )
+        segmented.grid(row=0, column=1, sticky="w")
 
     def _dropdown(
         self,
@@ -659,6 +701,7 @@ class SybilView:
                 ctk.CTkCheckBox,
                 ctk.CTkRadioButton,
                 ctk.CTkComboBox,
+                ctk.CTkSegmentedButton,
             )
             if isinstance(widget, with_state):
                 with contextlib.suppress(Exception):
@@ -722,9 +765,16 @@ class SybilView:
             data = self._collect()
         except ValueError as exc:
             self._emit("log", str(exc), "ERROR")
+            self._set_general_error(str(exc))
+            self._results_frame.pack_forget()
             return
 
-        self.controller.run(data, dicom_files=self._selected_series_files)
+        self.controller.run(
+            data,
+            dicom_files=self._selected_series_files,
+            ambiguous_field=self._ambiguous_field,
+            ambiguous_values=self._ambiguous_values,
+        )
 
     def _on_batch_submit(self) -> None:
         if self._running:
@@ -774,18 +824,20 @@ class SybilView:
         """Clear all inputs and results — called by new_run action."""
         self._age_var.set("")
         self._bmi_var.set("")
-        self._copd_var.set(False)
-        self._education_var.set(next(iter(EDUCATION_OPTIONS)))
-        self._ethnicity_var.set(next(iter(ETHNICITY_OPTIONS)))
-        self._family_lc_var.set(False)
-        self._personal_cancer_var.set(False)
+        self._copd_var.set(NOT_AVAILABLE)
+        self._education_var.set(NOT_AVAILABLE)
+        self._ethnicity_var.set(NOT_AVAILABLE)
+        self._family_lc_var.set(NOT_AVAILABLE)
+        self._personal_cancer_var.set(NOT_AVAILABLE)
         self._smoking_duration_var.set("")
         self._smoking_intensity_var.set("")
         self._smoking_quit_time_var.set("")
-        self._smoking_status_var.set(False)
+        self._smoking_status_var.set(NOT_AVAILABLE)
         self._ct_dir_var.set("No folder selected")
         self._six_year_risk.set("")
         self._ct_input_mode_var.set("ct")
+        self._ambiguous_field = None
+        self._ambiguous_values = None
         self._series_options = {}
         self._selected_series_files = None
         self._series_var.set("")
@@ -802,8 +854,17 @@ class SybilView:
         self._smoking_intensity_error_var.set("")
         self._smoking_quit_time_error_var.set("")
         self._six_year_risk_error_var.set("")
+        self._set_general_error("")
 
         self._clear_error_state()
+
+    def _set_general_error(self, message: str) -> None:
+        """Show/hide the always-visible banner above the Run button."""
+        self._general_error_var.set(message)
+        if message:
+            self._general_error_label.grid()
+        else:
+            self._general_error_label.grid_remove()
 
     def _clear_error_state(self) -> None:
         for entry in self._entries.values():
@@ -824,20 +885,55 @@ class SybilView:
             entry.configure(border_color=BORDER_COLOUR)
 
     def _collect(self) -> SybilInputData:
-        """Collect and return validated form data."""
-        parse_errors: dict[str, str] = {}
+        """Collect and return validated form data.
 
-        # ── 1. Parse strings → Python types ────────────────────────────────
-        # Collect ALL parse errors before raising so every bad field is shown.
+        Exactly one field (other than the CT folder / 6-year risk choice,
+        which already has its own required-one-of-two rule) may be left
+        blank / "Not available". A missing numeric field is treated as 0;
+        a missing categorical field is recorded on self._ambiguous_field /
+        self._ambiguous_values so the caller can run the analysis once per
+        option instead of a single pass.
+        """
+        self._ambiguous_field = None
+        self._ambiguous_values = None
+
+        parse_errors: dict[str, str] = {}
         fields: dict = {}
 
-        for field, var, label in [
+        numeric_fields = [
             ("age", self._age_var, "Age"),
             ("bmi", self._bmi_var, "BMI"),
             ("smoking_duration", self._smoking_duration_var, "Smoking duration"),
             ("smoking_intensity", self._smoking_intensity_var, "Smoking intensity"),
             ("smoking_quit_time", self._smoking_quit_time_var, "Smoking quit time"),
-        ]:
+        ]
+        categorical_fields = [
+            ("education", self._education_var, EDUCATION_OPTIONS),
+            ("ethnicity", self._ethnicity_var, ETHNICITY_OPTIONS),
+            ("copd", self._copd_var, YES_NO_OPTIONS),
+            ("family_lc_history", self._family_lc_var, YES_NO_OPTIONS),
+            ("personal_cancer_history", self._personal_cancer_var, YES_NO_OPTIONS),
+            ("smoking_status", self._smoking_status_var, YES_NO_OPTIONS),
+        ]
+
+        blank_numeric = [f for f, var, _ in numeric_fields if not var.get().strip()]
+        blank_categorical = [
+            f for f, var, _ in categorical_fields if var.get() == NOT_AVAILABLE
+        ]
+        blank_fields = blank_numeric + blank_categorical
+
+        if len(blank_fields) > 1:
+            names = ", ".join(_FIELD_DISPLAY_NAMES.get(f, f) for f in blank_fields)
+            raise ValueError(
+                f"Only one field may be left blank or Not available. "
+                f"Currently missing: {names}."
+            )
+
+        # ── 1. Numeric fields — the one allowed-blank one becomes 0 ────────
+        for field, var, label in numeric_fields:
+            if field in blank_numeric:
+                fields[field] = 0.0
+                continue
             try:
                 fields[field] = FieldParser.float(field, var.get(), label)
             except ParseError as exc:
@@ -868,16 +964,22 @@ class SybilView:
             self._show_field_errors(parse_errors)  # highlight bad fields
             raise ValueError("Please fix the highlighted fields.")
 
-        # ── 2. Map dropdowns / booleans ────────────────────────────────────
-        fields.update(
-            copd=int(self._copd_var.get()),
-            education=EDUCATION_OPTIONS.get(self._education_var.get(), 1),
-            ethnicity=ETHNICITY_OPTIONS.get(self._ethnicity_var.get(), "White"),
-            family_lc_history=int(self._family_lc_var.get()),
-            personal_cancer_history=int(self._personal_cancer_var.get()),
-            smoking_status=int(self._smoking_status_var.get()),
-            ct_scan_dir=ct_scan_dir,
-        )
+        # ── 2. Categorical fields — the one allowed-blank one gets a
+        #      placeholder value for this run, and every real option is
+        #      recorded so the controller can score all of them.
+        ambiguous_field = blank_categorical[0] if blank_categorical else None
+        if ambiguous_field:
+            self._ambiguous_field = ambiguous_field
+            self._ambiguous_values = dict(
+                next(opts for f, _, opts in categorical_fields if f == ambiguous_field)
+            )
+
+        for field, var, opts in categorical_fields:
+            fields[field] = (
+                next(iter(opts.values())) if field == ambiguous_field else opts[var.get()]
+            )
+
+        fields["ct_scan_dir"] = ct_scan_dir
 
         # ── 3. Construct model — __post_init__ validates business rules ─────
         try:
@@ -957,17 +1059,32 @@ class SybilView:
             elif event.message == "running_batch":
                 self._show_overlay(batch_mode=True)
 
-            elif event.message in ("idle", "error"):
+            elif event.message == "idle":
                 self._hide_overlay()
+
+            elif event.message == "error":
+                self._hide_overlay()
+                self._results_frame.pack_forget()
 
         elif event.type == "sybil_result":
             if isinstance(event.data, dict) and "output_path" in event.data:
                 self._show_results(f"Batch complete. Results saved in:\n{event.data['output_path']}")
                 self._hide_overlay()
+            elif event.data and event.data.get("results"):
+                rows: list[tuple[str, float]] = event.data["results"]
+                field_name = _FIELD_DISPLAY_NAMES.get(
+                    event.data.get("field"), event.data.get("field")
+                )
+                width = max(len(label) for label, _ in rows)
+                lines = [
+                    f"{field_name} was Not available — showing the result for "
+                    "every option:",
+                    "",
+                ]
+                lines += [f"  {label.ljust(width)} : {epi:.1%}" for label, epi in rows]
+                self._show_results("\n".join(lines))
             elif event.data:
-                # yearly = event.data.get("yearly", [])
                 epi = event.data.get("epi", 0.0)
-                # lines = [f"Year {i + 1}: {v:.1%}" for i, v in enumerate(yearly)]
                 lines = ["", f"Final 6-year risk: {epi:.1%}"]
                 self._show_results("\n".join(lines))
 

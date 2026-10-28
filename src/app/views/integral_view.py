@@ -42,9 +42,27 @@ if TYPE_CHECKING:
 
 # ─────────────────────────────── OPTIONS ───────────────────────────────
 
+NOT_AVAILABLE = "Not available"
+
 SEX_OPTIONS = {
     "Male": 0,
     "Female": 1,
+}
+
+# Shared by every tri-state Yes/No field (family history, COPD/emphysema,
+# former smoker).
+YES_NO_OPTIONS: dict[str, int] = {"No": 0, "Yes": 1}
+
+_FIELD_DISPLAY_NAMES: dict[str, str] = {
+    "age": "Age",
+    "bmi": "BMI",
+    "duration": "Smoking duration",
+    "cigday": "Cigarettes per day",
+    "quittime": "Smoking quit time",
+    "female": "Sex",
+    "fhlc": "Family history of lung cancer",
+    "copdemph": "COPD / emphysema",
+    "formersmk": "Former smoker",
 }
 
 
@@ -57,15 +75,19 @@ class IntegralView:
 
         # ── clinical vars ───────────────────────────────
         self._age_var = tk.StringVar()
-        self._gender_var = tk.StringVar(value="Male")
-        self._fhlc_var = tk.BooleanVar(value=False)
-        self._copd_var = tk.BooleanVar(value=False)
-        self._former_smoker_var = tk.BooleanVar(value=False)
+        self._gender_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._fhlc_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._copd_var = tk.StringVar(value=NOT_AVAILABLE)
+        self._former_smoker_var = tk.StringVar(value=NOT_AVAILABLE)
 
         self._duration_var = tk.StringVar()
         self._cigday_var = tk.StringVar()
         self._quit_var = tk.StringVar()
         self._bmi_var = tk.StringVar()
+
+        # ── "exactly one field may be missing" support ─────────────────────
+        self._ambiguous_field: str | None = None
+        self._ambiguous_values: dict[str, int | str] | None = None
 
         # ── files (image and mask scans) ────────────────
         self._image_file_var = tk.StringVar(value="No file selected")
@@ -311,13 +333,29 @@ class IntegralView:
         )
         bottom.grid_columnconfigure(0, weight=1)
 
+        # General validation error (e.g. more than one field left blank) —
+        # placed outside the scrollable form so it's always visible without
+        # needing the Activity Log panel open.
+        self._general_error_var = tk.StringVar()
+        self._general_error_label = ctk.CTkLabel(
+            bottom,
+            textvariable=self._general_error_var,
+            text_color=ERROR_COLOUR,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            wraplength=600,
+            justify="left",
+            anchor="w",
+        )
+        self._general_error_label.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_XS))
+        self._general_error_label.grid_remove()
+
         self.run_button = ctk.CTkButton(
             bottom,
             text="Run INTEGRAL-Radiomics",
             height=44,
             command=self._on_submit,
         )
-        self.run_button.grid(row=0, column=0, sticky="ew")
+        self.run_button.grid(row=1, column=0, sticky="ew")
 
         # ── overlay (lifted during a run) ────────────────────────────────
         self._overlay = RunningOverlay(self.root)
@@ -358,13 +396,13 @@ class IntegralView:
     def _build_clinical(self, p: ctk.CTkFrame):
         self._entry(p, "age", "Age (years)", self._age_var, self._age_error)
         self._entry(p, "bmi", "BMI (kg/m^2) ", self._bmi_var, self._bmi_error)
-        self._dropdown(p, "Sex", self._gender_var, list(SEX_OPTIONS.keys()))
+        self._dropdown(p, "Sex", self._gender_var, [NOT_AVAILABLE, *SEX_OPTIONS])
 
-        self._checkbox(p, "Family history of lung cancer", self._fhlc_var)
-        self._checkbox(p, "COPD / emphysema", self._copd_var)
+        self._tri_state(p, "Family history of lung cancer", self._fhlc_var)
+        self._tri_state(p, "COPD / emphysema", self._copd_var)
 
     def _build_smoking(self, p: ctk.CTkFrame):
-        self._checkbox(p, "Former smoker", self._former_smoker_var)
+        self._tri_state(p, "Former smoker", self._former_smoker_var)
         self._entry(
             p,
             "duration",
@@ -491,17 +529,15 @@ class IntegralView:
 
         return entry
 
-    def _checkbox(self, parent: ctk.CTkFrame, label: str, var: tk.BooleanVar) -> None:
+    def _tri_state(self, parent: ctk.CTkFrame, label: str, var: tk.StringVar) -> None:
+        """A No / Yes / Not available selector — defaults to Not available."""
         r = self._row(parent)
         self._label(r, label)
 
-        checkbox = ctk.CTkCheckBox(r, text="0 - No", variable=var)
-        checkbox.grid(row=0, column=1, sticky="w")
-
-        def _update_text(*_args):
-            checkbox.configure(text="1 - Yes" if var.get() else "0 - No")
-
-        var.trace_add("write", _update_text)
+        segmented = ctk.CTkSegmentedButton(
+            r, values=[NOT_AVAILABLE, "No", "Yes"], variable=var
+        )
+        segmented.grid(row=0, column=1, sticky="w")
 
     def _dropdown(
         self,
@@ -550,6 +586,7 @@ class IntegralView:
                 ctk.CTkSwitch,
                 ctk.CTkOptionMenu,
                 ctk.CTkCheckBox,
+                ctk.CTkSegmentedButton,
             )
             if isinstance(widget, with_state):
                 with contextlib.suppress(Exception):
@@ -602,10 +639,16 @@ class IntegralView:
             data = self._collect()
         except ValueError as exc:
             self._emit("log", str(exc), "ERROR")
+            self._set_general_error(str(exc))
+            self._results_frame.pack_forget()
             return
 
         self._show_overlay()
-        self.controller.run(data)
+        self.controller.run(
+            data,
+            ambiguous_field=self._ambiguous_field,
+            ambiguous_values=self._ambiguous_values,
+        )
 
     def _on_batch_submit(self) -> None:
         if self._running:
@@ -646,15 +689,17 @@ class IntegralView:
     def reset(self) -> None:
         """Clear all inputs and results — called by new_run action."""
         self._age_var.set("")
-        self._gender_var.set("Male")
-        self._fhlc_var.set(False)
-        self._copd_var.set(False)
-        self._former_smoker_var.set(False)
+        self._gender_var.set(NOT_AVAILABLE)
+        self._fhlc_var.set(NOT_AVAILABLE)
+        self._copd_var.set(NOT_AVAILABLE)
+        self._former_smoker_var.set(NOT_AVAILABLE)
         self._duration_var.set("")
         self._cigday_var.set("")
         self._bmi_var.set("")
         self._image_file_var.set("No file selected")
         self._mask_file_var.set("No file selected")
+        self._ambiguous_field = None
+        self._ambiguous_values = None
         self._clear_errors()
         self._results_frame.pack_forget()
 
@@ -666,6 +711,15 @@ class IntegralView:
         self._smoking_duration_error_var.set("")
         self._smoking_intensity_error_var.set("")
         self._smoking_quit_time_error_var.set("")
+        self._set_general_error("")
+
+    def _set_general_error(self, message: str) -> None:
+        """Show/hide the always-visible banner above the Run button."""
+        self._general_error_var.set(message)
+        if message:
+            self._general_error_label.grid()
+        else:
+            self._general_error_label.grid_remove()
 
     # ─────────────────────────────── COLLECT ─────────────────────────────
     def set_entry_error_state(self, key: str, error_var: tk.StringVar):
@@ -680,45 +734,94 @@ class IntegralView:
             entry.configure(border_color=BORDER_COLOUR)
 
     def _collect(self) -> IntegralClinicalData:
-        """Collect and return validated form data."""
-        parse_errors: dict[str, str] = {}
+        """Collect and return validated form data.
 
-        # ── 1. Parse strings → Python types ────────────────────────────────
-        # Collect ALL parse errors before raising so every bad field is shown.
+        Exactly one field (other than the CT image / nodule mask, which stay
+        strictly required) may be left blank / "Not available". A missing
+        numeric field is treated as 0; a missing categorical field is
+        recorded on self._ambiguous_field / self._ambiguous_values so the
+        caller can run the analysis once per option instead of a single
+        pass.
+        """
+        self._ambiguous_field = None
+        self._ambiguous_values = None
+
+        parse_errors: dict[str, str] = {}
         fields: dict = {}
 
-        for field, var, label in [
+        int_fields = [
             ("age", self._age_var, "Age"),
             ("duration", self._duration_var, "Smoking duration"),
             ("cigday", self._cigday_var, "Cig/day"),
             ("quittime", self._quit_var, "Smoking quit time"),
-        ]:
+        ]
+        categorical_fields = [
+            ("female", self._gender_var, SEX_OPTIONS),
+            ("fhlc", self._fhlc_var, YES_NO_OPTIONS),
+            ("copdemph", self._copd_var, YES_NO_OPTIONS),
+            ("formersmk", self._former_smoker_var, YES_NO_OPTIONS),
+        ]
+
+        blank_numeric = [f for f, var, _ in int_fields if not var.get().strip()]
+        blank_numeric += ["bmi"] if not self._bmi_var.get().strip() else []
+        blank_categorical = [
+            f for f, var, _ in categorical_fields if var.get() == NOT_AVAILABLE
+        ]
+        blank_fields = blank_numeric + blank_categorical
+
+        if len(blank_fields) > 1:
+            names = ", ".join(_FIELD_DISPLAY_NAMES.get(f, f) for f in blank_fields)
+            raise ValueError(
+                f"Only one field may be left blank or Not available. "
+                f"Currently missing: {names}."
+            )
+
+        # ── 1. Numeric fields — the one allowed-blank one becomes 0 ────────
+        for field, var, label in int_fields:
+            if field in blank_numeric:
+                fields[field] = 0
+                continue
             try:
                 fields[field] = FieldParser.int(field, var.get(), label)
             except ParseError as exc:
                 parse_errors[exc.field] = exc.message
 
-        try:
-            fields["bmi"] = FieldParser.float("bmi", self._bmi_var.get(), "BMI")
-        except ParseError as exc:
-            parse_errors[exc.field] = exc.message
+        if "bmi" in blank_numeric:
+            fields["bmi"] = 0.0
+        else:
+            try:
+                fields["bmi"] = FieldParser.float("bmi", self._bmi_var.get(), "BMI")
+            except ParseError as exc:
+                parse_errors[exc.field] = exc.message
 
         if parse_errors:
             self._show_field_errors(parse_errors)  # highlight bad fields
             raise ValueError("Please fix the highlighted fields.")
 
-        # ── 2. Map dropdowns / booleans ────────────────────────────────────
-        fields.update(
-            female=SEX_OPTIONS[self._gender_var.get()],
-            fhlc=int(self._fhlc_var.get()),
-            copdemph=int(self._copd_var.get()),
-            formersmk=int(self._former_smoker_var.get()),
-            image_file=self._image_file_var.get()
+        # ── 2. Categorical fields — the one allowed-blank one gets a
+        #      placeholder value for this run, and every real option is
+        #      recorded so the controller can score all of them.
+        ambiguous_field = blank_categorical[0] if blank_categorical else None
+        if ambiguous_field:
+            self._ambiguous_field = ambiguous_field
+            self._ambiguous_values = dict(
+                next(opts for f, _, opts in categorical_fields if f == ambiguous_field)
+            )
+
+        for field, var, opts in categorical_fields:
+            fields[field] = (
+                next(iter(opts.values())) if field == ambiguous_field else opts[var.get()]
+            )
+
+        fields["image_file"] = (
+            self._image_file_var.get()
             if self._image_file_var.get() != "No file selected"
-            else None,
-            mask_file=self._mask_file_var.get()
+            else None
+        )
+        fields["mask_file"] = (
+            self._mask_file_var.get()
             if self._mask_file_var.get() != "No file selected"
-            else None,
+            else None
         )
 
         # ── 3. Construct model — __post_init__ validates business rules ─────
@@ -799,8 +902,12 @@ class IntegralView:
             elif event.message == "running_batch":
                 self._show_overlay(batch_mode=True)
 
-            elif event.message in ("idle", "error"):
+            elif event.message == "idle":
                 self._hide_overlay()
+
+            elif event.message == "error":
+                self._hide_overlay()
+                self._results_frame.pack_forget()
 
         elif event.type == "integral_status":
             if event.message == "R_missing":
@@ -821,6 +928,25 @@ class IntegralView:
         elif event.type == "radiomics_result":
             if isinstance(event.data, dict) and "output_path" in event.data:
                 self._show_results(f"Batch complete. Results saved in:\n{event.data['output_path']}")
+                self._hide_overlay()
+
+            elif event.data and event.data.get("results"):
+                rows: list[tuple[str, float]] = event.data["results"]
+                field_name = _FIELD_DISPLAY_NAMES.get(
+                    event.data.get("field"), event.data.get("field")
+                )
+                width = max(len(label) for label, _ in rows)
+                lines = [
+                    f"{field_name} was Not available — showing the result for "
+                    "every option:",
+                    "",
+                ]
+                lines += [
+                    f"  {label.ljust(width)} : {format_percent(prob)}"
+                    for label, prob in rows
+                ]
+                self._show_results("\n".join(lines))
+                self._hide_overlay()
 
             elif not event.data or "probability" not in event.data:
                 return

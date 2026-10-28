@@ -34,14 +34,23 @@ class IntegralController(BaseController):
         super().__init__(root, bus)
 
         self._pending = None
+        self._ambiguous_field: str | None = None
+        self._ambiguous_values: dict[str, int | str] | None = None
         self._running = False
         self._batch_active = False
         self._batch_cancel = False
 
     # ─────────────────────────────── RUN ───────────────────────────────
 
-    def run(self, data: IntegralClinicalData) -> None:
+    def run(
+        self,
+        data: IntegralClinicalData,
+        ambiguous_field: str | None = None,
+        ambiguous_values: dict[str, int | str] | None = None,
+    ) -> None:
         self._pending = data
+        self._ambiguous_field = ambiguous_field
+        self._ambiguous_values = ambiguous_values
         self._set_state("running_single")
 
         self._log("Running INTEGRAL model (R subprocess)...")
@@ -68,6 +77,24 @@ class IntegralController(BaseController):
         try:
             payload = self._prepare_payload(self._pending)
 
+            option_labels: list[str] = []
+            if self._ambiguous_field and self._ambiguous_values:
+                # One field was left "Not available" — score every option
+                # in a single R call (predict_integral_radiomics already
+                # accepts multi-row input for batch mode) instead of
+                # spawning a separate subprocess per option. Note: unlike
+                # Sybil-Epi, integralrad has no exported way to reuse a
+                # cached radiomics extraction across rows, so each option
+                # still re-extracts features for the same image/mask.
+                rows = []
+                for label, value in self._ambiguous_values.items():
+                    rows.append(
+                        self._payload_to_row({**payload, self._ambiguous_field: value})
+                    )
+                    option_labels.append(label)
+            else:
+                rows = [self._payload_to_row(payload)]
+
             # Build temporary CSV for R
             with tempfile.NamedTemporaryFile(
                 suffix=".csv",
@@ -75,23 +102,7 @@ class IntegralController(BaseController):
             ) as f:
                 tmp_csv = Path(f.name)
 
-            df = pd.DataFrame(
-                [
-                    {
-                        "image": payload["image"],
-                        "mask": payload["mask"],
-                        "age": int(payload["age"]),
-                        "sex": 1 if payload["female"] else 0,
-                        "bmi": float(payload["bmi"]),
-                        "fhlc": int(payload["fhlc"]),
-                        "copdemph": int(payload["copdemph"]),
-                        "formersmk": int(payload["formersmk"]),
-                        "duration": int(payload["duration"]),
-                        "cigday": int(payload["cigday"]),
-                        "quittime": int(payload["quittime"]),
-                    }
-                ]
-            )
+            df = pd.DataFrame(rows)
             df.to_csv(tmp_csv, index=False)
 
             r_path = str(tmp_csv).replace("\\", "/")
@@ -158,16 +169,20 @@ class IntegralController(BaseController):
 
             # Parse JSON
             preds = json.loads(stdout)
-            row = preds[0]  # single row expected
-
-            self._log(f"Prediction result: {row}")
-
-            # Find probability column
-            probability = float(row["pred_malignant"])
-
             self._progress(0.8)
 
-            self._on_complete(probability)
+            if option_labels:
+                results = [
+                    (label, float(row["pred_malignant"]))
+                    for label, row in zip(option_labels, preds, strict=True)
+                ]
+                self._log(f"Prediction results: {results}")
+                self._on_complete_multi(results)
+            else:
+                row = preds[0]  # single row expected
+                self._log(f"Prediction result: {row}")
+                probability = float(row["pred_malignant"])
+                self._on_complete(probability)
 
         except subprocess.CalledProcessError as e:
             self._error(f"integral-radiomics process failed: {e.stderr}")
@@ -200,6 +215,21 @@ class IntegralController(BaseController):
             "mask": data.mask_file,
         }
 
+    def _payload_to_row(self, payload: dict) -> dict:
+        return {
+            "image": payload["image"],
+            "mask": payload["mask"],
+            "age": int(payload["age"]),
+            "sex": 1 if payload["female"] else 0,
+            "bmi": float(payload["bmi"]),
+            "fhlc": int(payload["fhlc"]),
+            "copdemph": int(payload["copdemph"]),
+            "formersmk": int(payload["formersmk"]),
+            "duration": int(payload["duration"]),
+            "cigday": int(payload["cigday"]),
+            "quittime": int(payload["quittime"]),
+        }
+
     # ─────────────────────────────── RESULT ─────────────────────────────
 
     def _on_complete(self, probability: float) -> None:
@@ -216,6 +246,24 @@ class IntegralController(BaseController):
                 data={
                     "probability": probability,
                 },
+            )
+        )
+        self._set_state("idle")
+
+    def _on_complete_multi(self, results: list[tuple[str, float]]) -> None:
+        for label, probability in results:
+            self._log(
+                f"{self._ambiguous_field}={label}: "
+                f"lung cancer probability={format_percent(probability)}",
+                "SUCCESS",
+            )
+
+        self._progress(1.0)
+
+        self._emit(
+            AppEvent(
+                type="radiomics_result",
+                data={"field": self._ambiguous_field, "results": results},
             )
         )
 

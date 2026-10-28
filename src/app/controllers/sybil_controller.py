@@ -5,7 +5,7 @@ import os
 import threading
 import time
 import traceback
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import certifi
@@ -41,6 +41,8 @@ class SybilController(BaseController):
         super().__init__(root, bus)
         self._model = None
         self._pending = None
+        self._ambiguous_field: str | None = None
+        self._ambiguous_values: dict[str, int | str] | None = None
         self._infer_active = False
         self._batch_active = False
         self._batch_cancel = False
@@ -75,7 +77,16 @@ class SybilController(BaseController):
 
         threading.Thread(target=_task, daemon=True).start()
 
-    def run(self, data, dicom_files: list[str] | None = None) -> None:
+    def run(
+        self,
+        data,
+        dicom_files: list[str] | None = None,
+        ambiguous_field: str | None = None,
+        ambiguous_values: dict[str, int | str] | None = None,
+    ) -> None:
+        self._ambiguous_field = ambiguous_field
+        self._ambiguous_values = ambiguous_values
+
         if data.six_year_risk:
             self._pending = data
             self._set_state("running")
@@ -155,23 +166,53 @@ class SybilController(BaseController):
 
     def _on_complete(self, yearly) -> None:
         self._infer_active = False
+        results: list[tuple[str, float]] | None = None
         try:
             self._log(f"Sybil Scores {yearly}")
             self._log(json.dumps(asdict(self._pending)))
-            epi_in = epi_input_from_individual_data(self._pending, yearly[5])
-            epi = calculate_sybil_epi_score(epi_in)
+
+            if self._ambiguous_field and self._ambiguous_values:
+                # One field was left "Not available" — the CT/6-year-risk
+                # score above was computed once; reuse it for every option
+                # of that field instead of rerunning inference per option.
+                results = []
+                for label, value in self._ambiguous_values.items():
+                    variant = replace(self._pending, **{self._ambiguous_field: value})
+                    epi_in = epi_input_from_individual_data(variant, yearly[5])
+                    results.append((label, calculate_sybil_epi_score(epi_in)))
+            else:
+                epi_in = epi_input_from_individual_data(self._pending, yearly[5])
+                epi = calculate_sybil_epi_score(epi_in)
         except Exception as exc:
             self._error(f"EPI scoring failed: {exc}")
             return
 
         self._progress(1.0)
-        self._log(f"Final 6-year risk: {epi:.1%}", "SUCCESS")
-        self._emit(
-            AppEvent(
-                type="sybil_result",
-                data={"yearly": list(yearly), "epi": epi},
+
+        if results is not None:
+            for label, score in results:
+                self._log(
+                    f"{self._ambiguous_field}={label}: 6-year risk {score:.1%}",
+                    "SUCCESS",
+                )
+            self._emit(
+                AppEvent(
+                    type="sybil_result",
+                    data={
+                        "yearly": list(yearly),
+                        "field": self._ambiguous_field,
+                        "results": results,
+                    },
+                )
             )
-        )
+        else:
+            self._log(f"Final 6-year risk: {epi:.1%}", "SUCCESS")
+            self._emit(
+                AppEvent(
+                    type="sybil_result",
+                    data={"yearly": list(yearly), "epi": epi},
+                )
+            )
         self._set_state("idle")
 
     def _row_to_individual(self, row) -> SybilInputData:
