@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/hung-lab/PulmoRisk/compare/v1.5.0...v1.6.0) (2026-11-09)
+
+
+### Features
+
+* Allow exactly one field to be left blank or Not available. A missing numeric field is replaced with 0; a missing categorical field (Education, Ethnicity, Sex, or any Yes/No field) runs the analysis once per option and shows the results in a table. ([9a6d422](https://github.com/hung-lab/PulmoRisk/commit/9a6d422f96e36847559d78f3c8d8de605e8e9b61))
+
+
+### Bug Fixes
+
+* Overlay disappearing on row errors, clarify error messages, and show results as 2-decimal percentages consistently. ([d4be8cd](https://github.com/hung-lab/PulmoRisk/commit/d4be8cd40bca091300266d0611e8472170e5efcb))
+
 ## [1.5.0](https://github.com/hung-lab/PulmoRisk/compare/v1.4.15...v1.5.0) (2026-10-20)
 
 
