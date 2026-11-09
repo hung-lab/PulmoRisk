@@ -19,6 +19,13 @@ from app.config.settings import (
 from app.models.individual_model import ModelValidationError, SybilInputData
 from app.utils.dicom_series import find_dicom_series
 from app.utils.event_bus import AppEvent
+from app.utils.field_options import (
+    SYBIL_EDUCATION_OPTIONS,
+    SYBIL_ETHNICITY_OPTIONS,
+    SYBIL_FIELD_DISPLAY_NAMES,
+    SYBIL_NUMERIC_FIELD_OPTIONS,
+    SYBIL_YES_NO_OPTIONS,
+)
 from app.utils.ui_config import (
     BUTTON_GAP,
     CARD_PAD_X,
@@ -40,42 +47,15 @@ if TYPE_CHECKING:
 
 
 # ── Option maps (display label → integer code stored in SybilInputData) ──────
+# Shared with the batch controller — see app.utils.field_options.
 
 NOT_AVAILABLE = "Not available"
 
-EDUCATION_OPTIONS: dict[str, int] = {
-    "1 - Less than high school graduate": 1,
-    "2 - High school graduate": 2,
-    "3 - Some training after high school": 3,
-    "4 - Some college": 4,
-    "5 - College graduate": 5,
-    "6 - Postgraduate or professional degree": 6,
-}
-
-ETHNICITY_OPTIONS: dict[str, str] = {
-    "Asian": "Asian",
-    "Black": "Black",
-    "White": "White",
-    "Others": "Others",
-}
-
-# Shared by every tri-state Yes/No field (COPD, family history, personal
-# cancer history, current smoker).
-YES_NO_OPTIONS: dict[str, int] = {"No": 0, "Yes": 1}
-
-_FIELD_DISPLAY_NAMES: dict[str, str] = {
-    "age": "Age",
-    "bmi": "BMI",
-    "smoking_duration": "Smoking duration",
-    "smoking_intensity": "Smoking intensity",
-    "smoking_quit_time": "Smoking quit time",
-    "education": "Education",
-    "ethnicity": "Ethnicity",
-    "copd": "COPD",
-    "family_lc_history": "Family history of lung cancer",
-    "personal_cancer_history": "Personal history of any cancer",
-    "smoking_status": "Current smoker",
-}
+EDUCATION_OPTIONS = SYBIL_EDUCATION_OPTIONS
+ETHNICITY_OPTIONS = SYBIL_ETHNICITY_OPTIONS
+YES_NO_OPTIONS = SYBIL_YES_NO_OPTIONS
+NUMERIC_FIELD_OPTIONS = SYBIL_NUMERIC_FIELD_OPTIONS
+_FIELD_DISPLAY_NAMES = SYBIL_FIELD_DISPLAY_NAMES
 
 # Overlay stage labels keyed by the log messages the controller emits.
 _STAGE_LABELS: dict[str, str] = {
@@ -240,7 +220,8 @@ class SybilView:
         ctk.CTkLabel(
             batch_card,
             text=(
-                "Upload a CSV containing individual metadata and CT scan folder paths.\n\n"
+                "Upload a CSV containing individual metadata and CT scan folder paths.\n"
+                "A maximum of one missing factor is allowed.\n\n"
                 "Required columns:\n"
                 "  - age (In years, 0 to 100)\n"
                 "  - bmi (Body mass index in kg/m^2, 0 to 100)\n"
@@ -889,10 +870,10 @@ class SybilView:
 
         Exactly one field (other than the CT folder / 6-year risk choice,
         which already has its own required-one-of-two rule) may be left
-        blank / "Not available". A missing numeric field is treated as 0;
-        a missing categorical field is recorded on self._ambiguous_field /
-        self._ambiguous_values so the caller can run the analysis once per
-        option instead of a single pass.
+        blank / "Not available". Whichever field it is — numeric or
+        categorical — is recorded on self._ambiguous_field /
+        self._ambiguous_values so the caller runs the analysis once per
+        fixed candidate value instead of a single pass.
         """
         self._ambiguous_field = None
         self._ambiguous_values = None
@@ -929,10 +910,14 @@ class SybilView:
                 f"Currently missing: {names}."
             )
 
-        # ── 1. Numeric fields — the one allowed-blank one becomes 0 ────────
+        ambiguous_field = blank_fields[0] if blank_fields else None
+
+        # ── 1. Numeric fields — the one allowed-blank one gets a
+        #      placeholder (the first candidate value) for this run; every
+        #      candidate is recorded so the controller can score all of them.
         for field, var, label in numeric_fields:
-            if field in blank_numeric:
-                fields[field] = 0.0
+            if field == ambiguous_field:
+                fields[field] = next(iter(NUMERIC_FIELD_OPTIONS[field].values()))
                 continue
             try:
                 fields[field] = FieldParser.float(field, var.get(), label)
@@ -964,15 +949,20 @@ class SybilView:
             self._show_field_errors(parse_errors)  # highlight bad fields
             raise ValueError("Please fix the highlighted fields.")
 
-        # ── 2. Categorical fields — the one allowed-blank one gets a
-        #      placeholder value for this run, and every real option is
-        #      recorded so the controller can score all of them.
-        ambiguous_field = blank_categorical[0] if blank_categorical else None
+        # ── 2. Categorical fields — same placeholder-now / score-all-later
+        #      treatment as the numeric fields above.
         if ambiguous_field:
             self._ambiguous_field = ambiguous_field
-            self._ambiguous_values = dict(
-                next(opts for f, _, opts in categorical_fields if f == ambiguous_field)
-            )
+            if ambiguous_field in NUMERIC_FIELD_OPTIONS:
+                self._ambiguous_values = dict(NUMERIC_FIELD_OPTIONS[ambiguous_field])
+            else:
+                self._ambiguous_values = dict(
+                    next(
+                        opts
+                        for f, _, opts in categorical_fields
+                        if f == ambiguous_field
+                    )
+                )
 
         for field, var, opts in categorical_fields:
             fields[field] = (
@@ -1072,20 +1062,23 @@ class SybilView:
                 self._hide_overlay()
             elif event.data and event.data.get("results"):
                 rows: list[tuple[str, float]] = event.data["results"]
-                field_name = _FIELD_DISPLAY_NAMES.get(
-                    event.data.get("field"), event.data.get("field")
+                ambiguous_field = event.data.get("field")
+                field_name = _FIELD_DISPLAY_NAMES.get(ambiguous_field, ambiguous_field)
+                what = (
+                    "common values"
+                    if ambiguous_field in NUMERIC_FIELD_OPTIONS
+                    else "every option"
                 )
                 width = max(len(label) for label, _ in rows)
                 lines = [
-                    f"{field_name} was Not available — showing the result for "
-                    "every option:",
+                    f"{field_name} was Not available — showing the result for {what}:",
                     "",
                 ]
-                lines += [f"  {label.ljust(width)} : {epi:.1%}" for label, epi in rows]
+                lines += [f"  {label.ljust(width)} : {epi:.2%}" for label, epi in rows]
                 self._show_results("\n".join(lines))
             elif event.data:
                 epi = event.data.get("epi", 0.0)
-                lines = ["", f"Final 6-year risk: {epi:.1%}"]
+                lines = ["", f"Lung cancer risk: {epi:.2%}"]
                 self._show_results("\n".join(lines))
 
         elif event.type == "ui_theme":

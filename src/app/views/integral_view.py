@@ -19,7 +19,12 @@ from app.models.individual_model import (
     ModelValidationError,
 )
 from app.utils.event_bus import AppEvent
-from app.utils.helpers import format_percent
+from app.utils.field_options import (
+    INTEGRAL_FIELD_DISPLAY_NAMES,
+    INTEGRAL_NUMERIC_FIELD_OPTIONS,
+    INTEGRAL_SEX_OPTIONS,
+    INTEGRAL_YES_NO_OPTIONS,
+)
 from app.utils.ui_config import (
     BUTTON_GAP,
     CARD_PAD_X,
@@ -41,29 +46,14 @@ if TYPE_CHECKING:
 
 
 # ─────────────────────────────── OPTIONS ───────────────────────────────
+# Shared with the batch controller — see app.utils.field_options.
 
 NOT_AVAILABLE = "Not available"
 
-SEX_OPTIONS = {
-    "Male": 0,
-    "Female": 1,
-}
-
-# Shared by every tri-state Yes/No field (family history, COPD/emphysema,
-# former smoker).
-YES_NO_OPTIONS: dict[str, int] = {"No": 0, "Yes": 1}
-
-_FIELD_DISPLAY_NAMES: dict[str, str] = {
-    "age": "Age",
-    "bmi": "BMI",
-    "duration": "Smoking duration",
-    "cigday": "Cigarettes per day",
-    "quittime": "Smoking quit time",
-    "female": "Sex",
-    "fhlc": "Family history of lung cancer",
-    "copdemph": "COPD / emphysema",
-    "formersmk": "Former smoker",
-}
+SEX_OPTIONS = INTEGRAL_SEX_OPTIONS
+YES_NO_OPTIONS = INTEGRAL_YES_NO_OPTIONS
+NUMERIC_FIELD_OPTIONS = INTEGRAL_NUMERIC_FIELD_OPTIONS
+_FIELD_DISPLAY_NAMES = INTEGRAL_FIELD_DISPLAY_NAMES
 
 
 class IntegralView:
@@ -233,7 +223,8 @@ class IntegralView:
         ctk.CTkLabel(
             batch_card,
             text=(
-                "Upload a CSV containing individual metadata and CT scan image and mask files.\n\n"
+                "Upload a CSV containing individual metadata and CT scan image and mask files.\n"
+                "A maximum of one missing factor is allowed.\n\n"
                 "Required columns:\n"
                 "- image_file (Full path to image in NRRD format)\n"
                 "- mask_file (Full path to nodule mask in NRRD format)\n"
@@ -737,10 +728,10 @@ class IntegralView:
         """Collect and return validated form data.
 
         Exactly one field (other than the CT image / nodule mask, which stay
-        strictly required) may be left blank / "Not available". A missing
-        numeric field is treated as 0; a missing categorical field is
-        recorded on self._ambiguous_field / self._ambiguous_values so the
-        caller can run the analysis once per option instead of a single
+        strictly required) may be left blank / "Not available". Whichever
+        field it is — numeric or categorical — is recorded on
+        self._ambiguous_field / self._ambiguous_values so the caller runs
+        the analysis once per fixed candidate value instead of a single
         pass.
         """
         self._ambiguous_field = None
@@ -776,18 +767,22 @@ class IntegralView:
                 f"Currently missing: {names}."
             )
 
-        # ── 1. Numeric fields — the one allowed-blank one becomes 0 ────────
+        ambiguous_field = blank_fields[0] if blank_fields else None
+
+        # ── 1. Numeric fields — the one allowed-blank one gets a
+        #      placeholder (the first candidate value) for this run; every
+        #      candidate is recorded so the controller can score all of them.
         for field, var, label in int_fields:
-            if field in blank_numeric:
-                fields[field] = 0
+            if field == ambiguous_field:
+                fields[field] = next(iter(NUMERIC_FIELD_OPTIONS[field].values()))
                 continue
             try:
                 fields[field] = FieldParser.int(field, var.get(), label)
             except ParseError as exc:
                 parse_errors[exc.field] = exc.message
 
-        if "bmi" in blank_numeric:
-            fields["bmi"] = 0.0
+        if ambiguous_field == "bmi":
+            fields["bmi"] = next(iter(NUMERIC_FIELD_OPTIONS["bmi"].values()))
         else:
             try:
                 fields["bmi"] = FieldParser.float("bmi", self._bmi_var.get(), "BMI")
@@ -798,15 +793,20 @@ class IntegralView:
             self._show_field_errors(parse_errors)  # highlight bad fields
             raise ValueError("Please fix the highlighted fields.")
 
-        # ── 2. Categorical fields — the one allowed-blank one gets a
-        #      placeholder value for this run, and every real option is
-        #      recorded so the controller can score all of them.
-        ambiguous_field = blank_categorical[0] if blank_categorical else None
+        # ── 2. Categorical fields — same placeholder-now / score-all-later
+        #      treatment as the numeric fields above.
         if ambiguous_field:
             self._ambiguous_field = ambiguous_field
-            self._ambiguous_values = dict(
-                next(opts for f, _, opts in categorical_fields if f == ambiguous_field)
-            )
+            if ambiguous_field in NUMERIC_FIELD_OPTIONS:
+                self._ambiguous_values = dict(NUMERIC_FIELD_OPTIONS[ambiguous_field])
+            else:
+                self._ambiguous_values = dict(
+                    next(
+                        opts
+                        for f, _, opts in categorical_fields
+                        if f == ambiguous_field
+                    )
+                )
 
         for field, var, opts in categorical_fields:
             fields[field] = (
@@ -855,12 +855,6 @@ class IntegralView:
                     self.set_entry_error_state(entry_key, err_var)
 
     # ─────────────────────────────── RESULTS ─────────────────────────────
-    def _format_result(self, lung_cancer_prob):
-        return {
-            "Lung Cancer Probability": lung_cancer_prob,
-            "Lung Cancer Probability Percentage": format_percent(lung_cancer_prob),
-        }
-
     def _show_results(self, status_text: str) -> None:
         """Render the results card at the bottom of the form."""
         self._results_label.configure(text=status_text)
@@ -932,17 +926,20 @@ class IntegralView:
 
             elif event.data and event.data.get("results"):
                 rows: list[tuple[str, float]] = event.data["results"]
-                field_name = _FIELD_DISPLAY_NAMES.get(
-                    event.data.get("field"), event.data.get("field")
+                ambiguous_field = event.data.get("field")
+                field_name = _FIELD_DISPLAY_NAMES.get(ambiguous_field, ambiguous_field)
+                what = (
+                    "common values"
+                    if ambiguous_field in NUMERIC_FIELD_OPTIONS
+                    else "every option"
                 )
                 width = max(len(label) for label, _ in rows)
                 lines = [
-                    f"{field_name} was Not available — showing the result for "
-                    "every option:",
+                    f"{field_name} was Not available — showing the result for {what}:",
                     "",
                 ]
                 lines += [
-                    f"  {label.ljust(width)} : {format_percent(prob)}"
+                    f"  {label.ljust(width)} : {prob:.2%}"
                     for label, prob in rows
                 ]
                 self._show_results("\n".join(lines))
@@ -953,10 +950,7 @@ class IntegralView:
 
             else:
                 lung_cancer_prob = event.data.get("probability", 0.0)
-                # format display
-                result_dict = self._format_result(lung_cancer_prob)
-                lines = "\n".join(f"{k}: {v}" for k, v in result_dict.items())
-                self._show_results(lines)
+                self._show_results(f"Lung cancer risk: {lung_cancer_prob:.2%}")
                 self._hide_overlay()
 
         elif event.type == "ui_theme":

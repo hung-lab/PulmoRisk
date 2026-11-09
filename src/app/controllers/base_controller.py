@@ -19,6 +19,15 @@ class BaseController:
         self._emit(AppEvent(type="log", message=message, level="ERROR"))
         self._emit(AppEvent(type="ui_state", message="error"))
 
+    def _log_error(self, message: str):
+        """Log-only error — unlike _error(), this does not flip ui_state to
+        "error". A batch worker uses this for a single row's failure, since
+        that row is already handled (an error row in the output); the
+        "error" ui_state is for a run that stopped entirely, and would
+        otherwise hide the batch overlay/results while the worker thread
+        keeps processing the remaining rows."""
+        self._emit(AppEvent(type="log", message=message, level="ERROR"))
+
     def _warn(self, message: str):
         self._emit(AppEvent(type="log", message=message, level="WARNING"))
 

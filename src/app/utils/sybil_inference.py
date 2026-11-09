@@ -9,7 +9,7 @@ from app.utils.sybil_epi import (
 )
 
 
-def run_sybil_pipeline(model, individual) -> tuple[float, str | None]:
+def run_sybil_pipeline(model, individual) -> tuple[float, str | None, float]:
     """
     Pure inference pipeline:
     - no UI
@@ -17,17 +17,20 @@ def run_sybil_pipeline(model, individual) -> tuple[float, str | None]:
     - no shared state
     - deterministic output
 
-    Returns the EPI score and, when CT inference ran, the label of the
-    series that was used (``None`` for a precomputed six_year_risk row) —
-    callers persist that label so a multi-series folder's automatic choice
-    is auditable in batch output.
+    Returns the EPI score, the label of the CT series that was used (when
+    CT inference ran — ``None`` for a precomputed six_year_risk row), and
+    the six-year Sybil score itself. Callers persist the series label so a
+    multi-series folder's automatic choice is auditable in batch output,
+    and reuse the six-year score to cheaply re-score the same row for every
+    option of a different missing field, without rerunning CT inference.
     """
 
     # A precomputed 6-year Sybil score skips CT inference entirely — mirrors
     # SybilController.run()'s single-individual branch.
     if individual.six_year_risk is not None:
-        epi_in = epi_input_from_individual_data(individual, individual.six_year_risk)
-        return calculate_sybil_epi_score(epi_in), None
+        six_year_score = individual.six_year_risk
+        epi_in = epi_input_from_individual_data(individual, six_year_score)
+        return calculate_sybil_epi_score(epi_in), None, six_year_score
 
     path = Path(individual.ct_scan_dir)
 
@@ -51,6 +54,7 @@ def run_sybil_pipeline(model, individual) -> tuple[float, str | None]:
     prediction = model.predict([serie])
 
     scores = prediction.scores[0]
+    six_year_score = scores[5]
 
-    epi_in = epi_input_from_individual_data(individual, scores[5])
-    return calculate_sybil_epi_score(epi_in), series.label
+    epi_in = epi_input_from_individual_data(individual, six_year_score)
+    return calculate_sybil_epi_score(epi_in), series.label, six_year_score

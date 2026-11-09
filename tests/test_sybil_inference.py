@@ -32,16 +32,17 @@ class TestPrecomputedRiskSkipsCtInference:
         individual = SybilInputData(
             **base_patient_kwargs, ct_scan_dir=None, six_year_risk=0.05
         )
-        score, series_label = run_sybil_pipeline(None, individual)
+        score, series_label, six_year_score = run_sybil_pipeline(None, individual)
         assert 0.0 < score < 1.0
         assert series_label is None
+        assert six_year_score == 0.05
 
     def test_higher_precomputed_risk_scores_higher(self, base_patient_kwargs):
-        low, _ = run_sybil_pipeline(
+        low, _, _ = run_sybil_pipeline(
             None,
             SybilInputData(**base_patient_kwargs, ct_scan_dir=None, six_year_risk=0.01),
         )
-        high, _ = run_sybil_pipeline(
+        high, _, _ = run_sybil_pipeline(
             None,
             SybilInputData(**base_patient_kwargs, ct_scan_dir=None, six_year_risk=0.9),
         )
@@ -94,8 +95,11 @@ class TestMultiSeriesAutoSelection:
             ),
             patch("app.utils.sybil_inference.Serie") as mock_serie,
         ):
-            score, series_label = run_sybil_pipeline(mock_model, individual)
+            score, series_label, six_year_score = run_sybil_pipeline(
+                mock_model, individual
+            )
 
         mock_serie.assert_called_once_with(large.files)
         assert series_label == "Large series - 3 slices"
         assert 0.0 < score < 1.0
+        assert six_year_score == 0.05

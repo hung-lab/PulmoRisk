@@ -13,6 +13,12 @@ import pandas as pd
 from app.controllers.base_controller import BaseController
 from app.models.individual_model import IntegralClinicalData
 from app.utils.event_bus import AppEvent
+from app.utils.field_options import (
+    INTEGRAL_CATEGORICAL_OPTIONS,
+    INTEGRAL_FIELD_DISPLAY_NAMES,
+    INTEGRAL_NUMERIC_FIELD_OPTIONS,
+    INTEGRAL_OPTIONAL_FIELDS,
+)
 from app.utils.helpers import (
     InvalidFileError,
     clean_r_subprocess_env,
@@ -20,8 +26,7 @@ from app.utils.helpers import (
     format_percent,
     validate_file_path,
 )
-from app.utils.integral_inference import run_inference_pipeline
-from app.utils.validators import BatchIntegralRowParser, ParseError
+from app.utils.validators import BatchIntegralRowParser, ParseError, find_blank_fields
 
 SEX_OPTIONS = {
     "Male": 0,
@@ -95,36 +100,56 @@ class IntegralController(BaseController):
             else:
                 rows = [self._payload_to_row(payload)]
 
-            # Build temporary CSV for R
-            with tempfile.NamedTemporaryFile(
-                suffix=".csv",
-                delete=False,
-            ) as f:
-                tmp_csv = Path(f.name)
+            preds = self._predict_rows(rows)
+            self._progress(0.8)
 
-            df = pd.DataFrame(rows)
-            df.to_csv(tmp_csv, index=False)
+            if option_labels:
+                results = [
+                    (label, float(row["pred_malignant"]))
+                    for label, row in zip(option_labels, preds, strict=True)
+                ]
+                self._log(f"Prediction results: {results}")
+                self._on_complete_multi(results)
+            else:
+                row = preds[0]  # single row expected
+                self._log(f"Prediction result: {row}")
+                probability = float(row["pred_malignant"])
+                self._on_complete(probability)
 
-            r_path = str(tmp_csv).replace("\\", "/")
+        except Exception as exc:
+            self._error(f"Inference error: {exc}")
+            self._set_state("error")
 
-            # R code to predict and output JSON
-            r_code = f"""
-            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            library(integralrad)
-            library(jsonlite)
+    def _predict_rows(self, rows: list[dict]) -> list[dict]:
+        """Run predict_integral_radiomics on a batch of R-ready rows in a
+        single Rscript subprocess call. Returns one prediction dict per row,
+        in the same order as *rows*."""
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            tmp_csv = Path(f.name)
 
-            preds <- predict_integral_radiomics("{r_path}")
-            cat(toJSON(preds, dataframe="rows"))
-            """
+        df = pd.DataFrame(rows)
+        df.to_csv(tmp_csv, index=False)
 
-            # Passing R code via `-e` on the command line crashes the R
-            # process outright (access violation) once integralrad spawns
-            # its own reticulate/uv subprocess — writing it to a script file
-            # and running that instead avoids whatever Windows argv quirk
-            # causes this.
-            script_file = Path(tempfile.gettempdir()) / f"{tmp_csv.stem}_predict.R"
-            script_file.write_text(r_code, encoding="utf-8")
+        r_path = str(tmp_csv).replace("\\", "/")
 
+        # R code to predict and output JSON
+        r_code = f"""
+        .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
+        library(integralrad)
+        library(jsonlite)
+
+        preds <- predict_integral_radiomics("{r_path}")
+        cat(toJSON(preds, dataframe="rows"))
+        """
+
+        # Passing R code via `-e` on the command line crashes the R process
+        # outright (access violation) once integralrad spawns its own
+        # reticulate/uv subprocess — writing it to a script file and running
+        # that instead avoids whatever Windows argv quirk causes this.
+        script_file = Path(tempfile.gettempdir()) / f"{tmp_csv.stem}_predict.R"
+        script_file.write_text(r_code, encoding="utf-8")
+
+        try:
             self._log("Calling integral-radiomics R library via Rscript...")
             self._log(
                 "Temporary CSV created",
@@ -148,7 +173,6 @@ class IntegralController(BaseController):
 
             rscript_path = find_rscript()
 
-            # Run R subprocess
             result = subprocess.run(  # nosec B603
                 [rscript_path, "--vanilla", str(script_file)],
                 env=env,
@@ -163,39 +187,17 @@ class IntegralController(BaseController):
 
             stdout = result.stdout.strip()
             if not stdout:
-                self._error("integral-radiomics returned empty output")
-                self._set_state("error")
-                return
+                raise RuntimeError("integral-radiomics returned empty output")
 
-            # Parse JSON
-            preds = json.loads(stdout)
-            self._progress(0.8)
-
-            if option_labels:
-                results = [
-                    (label, float(row["pred_malignant"]))
-                    for label, row in zip(option_labels, preds, strict=True)
-                ]
-                self._log(f"Prediction results: {results}")
-                self._on_complete_multi(results)
-            else:
-                row = preds[0]  # single row expected
-                self._log(f"Prediction result: {row}")
-                probability = float(row["pred_malignant"])
-                self._on_complete(probability)
+            return json.loads(stdout)
 
         except subprocess.CalledProcessError as e:
-            self._error(f"integral-radiomics process failed: {e.stderr}")
-            self._set_state("error")
-
-        except Exception as exc:
-            self._error(f"Inference error: {exc}")
-            self._set_state("error")
+            raise RuntimeError(f"integral-radiomics process failed: {e.stderr}") from e
 
         finally:
-            if "tmp_csv" in locals() and tmp_csv.exists():
+            if tmp_csv.exists():
                 tmp_csv.unlink()
-            if "script_file" in locals() and script_file.exists():
+            if script_file.exists():
                 script_file.unlink()
 
     # ─────────────────────────────── DATA PREP ─────────────────────────
@@ -280,13 +282,27 @@ class IntegralController(BaseController):
         # the batch loop already catches Exception and logs it per-row.
         return IntegralClinicalData(**parsed)
 
+    @staticmethod
+    def _candidates_for(field: str) -> dict:
+        """Label → value options for whichever field is missing in a row."""
+        return INTEGRAL_NUMERIC_FIELD_OPTIONS.get(field) or INTEGRAL_CATEGORICAL_OPTIONS[field]
+
+    def _blank_row_result(self, row_dict: dict, error: str) -> dict:
+        return {
+            **row_dict,
+            "pred_benign": None,
+            "pred_malignant": None,
+            "missing_field": None,
+            "error": error,
+        }
+
     def _run_batch_worker(self, csv_path: str) -> None:
         try:
             self._batch_active = True
             self._batch_cancel = False
 
             df = pd.read_csv(csv_path)
-            results = []
+            output_rows: list[dict] = []
 
             total = len(df)
 
@@ -307,72 +323,111 @@ class IntegralController(BaseController):
 
                 if self._batch_cancel:
                     self._log("Batch cancelled by user", "WARNING")
-
-                    remaining = total - len(results)
-
-                    results.extend(
-                        [
-                            {
-                                "pred_benign": None,
-                                "pred_malignant": None,
-                                "error": "cancelled",
-                            }
-                            for _ in range(remaining)
-                        ]
-                    )
+                    for j in range(i, total):
+                        output_rows.append(
+                            self._blank_row_result(dict(df.iloc[j]), "cancelled")
+                        )
                     break
 
+                row_dict = dict(row)
+
+                # At most one field (besides image_file / mask_file, which
+                # stay strictly required) may be blank — mirrors the
+                # single-patient form's rule.
+                blank = find_blank_fields(row_dict, INTEGRAL_OPTIONAL_FIELDS)
+                if len(blank) > 1:
+                    names = ", ".join(
+                        INTEGRAL_FIELD_DISPLAY_NAMES.get(f, f) for f in blank
+                    )
+                    msg = f"Only one field may be missing. Currently missing: {names}."
+                    self._warn(f"Row {i + 1} skipped: {msg}")
+                    output_rows.append(self._blank_row_result(row_dict, msg))
+                    continue
+
+                ambiguous_field = blank[0] if blank else None
+
+                missing_files = find_blank_fields(row_dict, ("image_file", "mask_file"))
+                if missing_files:
+                    names = " and ".join(missing_files)
+                    verb = "is" if len(missing_files) == 1 else "are"
+                    msg = f"{names} {verb} required."
+                    self._warn(f"Row {i + 1} skipped: {msg}")
+                    output_rows.append(self._blank_row_result(row_dict, msg))
+                    continue
+
                 try:
-                    individual = self._row_to_individual(row)
+                    parse_row = dict(row_dict)
+                    if ambiguous_field:
+                        # A placeholder for parsing/validation below — every
+                        # candidate value gets its own row sent to R.
+                        placeholder = next(iter(self._candidates_for(ambiguous_field).values()))
+                        parse_row[ambiguous_field] = str(placeholder)
+
+                    individual = self._row_to_individual(parse_row)
 
                     try:
                         validate_file_path(Path(individual.image_file), "image_file")
                         validate_file_path(Path(individual.mask_file), "mask_file")
                     except InvalidFileError as e:
-                        self._warn(
-                            f"Row {i + 1} skipped: {e.field_name} invalid ({e.reason})"
-                        )
-                        results.append(
-                            {
-                                "pred_benign": None,
-                                "pred_malignant": None,
-                                "error": f"{e.field_name} invalid ({e.reason})",
-                            }
-                        )
+                        msg = f"{e.field_name} invalid ({e.reason})"
+                        self._warn(f"Row {i + 1} skipped: {msg}")
+                        output_rows.append(self._blank_row_result(row_dict, msg))
                         continue
 
                     self._log(f"Running inference on row {i + 1} for individual: ")
 
-                    prediction = run_inference_pipeline(individual)
+                    payload = self._prepare_payload(individual)
 
-                    results.append(
-                        {
-                            "pred_benign": prediction[0],
-                            "pred_malignant": prediction[1],
-                            "error": None,
-                        }
-                    )
+                    if ambiguous_field:
+                        # One R call scores every option for this row — unlike
+                        # Sybil-Epi, integralrad has no exported way to reuse a
+                        # cached radiomics extraction, so each option still
+                        # re-extracts features for the same image/mask.
+                        field_label = INTEGRAL_FIELD_DISPLAY_NAMES.get(
+                            ambiguous_field, ambiguous_field
+                        )
+                        values = list(self._candidates_for(ambiguous_field).values())
+                        rows = [
+                            self._payload_to_row({**payload, ambiguous_field: value})
+                            for value in values
+                        ]
+                        preds = self._predict_rows(rows)
+
+                        for value, pred_row in zip(values, preds, strict=True):
+                            output_rows.append(
+                                {
+                                    **row_dict,
+                                    ambiguous_field: value,
+                                    "pred_benign": float(pred_row["pred_benign"]),
+                                    "pred_malignant": float(pred_row["pred_malignant"]),
+                                    "missing_field": field_label,
+                                    "error": None,
+                                }
+                            )
+                    else:
+                        preds = self._predict_rows([self._payload_to_row(payload)])
+                        pred_row = preds[0]
+                        output_rows.append(
+                            {
+                                **row_dict,
+                                "pred_benign": float(pred_row["pred_benign"]),
+                                "pred_malignant": float(pred_row["pred_malignant"]),
+                                "missing_field": None,
+                                "error": None,
+                            }
+                        )
 
                 except Exception as e:
-                    self._error(f"Row {i + 1} failed: {e}")
-                    self._error(traceback.format_exc())
-                    results.append(
-                        {
-                            "pred_benign": None,
-                            "pred_malignant": None,
-                            "error": str(e),
-                        }
-                    )
-                    break
+                    self._log_error(f"Row {i + 1} failed: {e}")
+                    self._log_error(traceback.format_exc())
+                    output_rows.append(self._blank_row_result(row_dict, str(e)))
 
-            df["pred_benign"] = [r["pred_benign"] for r in results]
-            df["pred_malignant"] = [r["pred_malignant"] for r in results]
-            df["error"] = [r["error"] for r in results]
+            output_df = pd.DataFrame(output_rows)
 
             output_path = str(Path(csv_path).with_suffix(""))
             output_path = output_path + "_scored.csv"
 
-            df.to_csv(output_path, index=False)
+            output_df.to_csv(output_path, index=False)
 
             self._batch_active = False
             self._set_state("idle")

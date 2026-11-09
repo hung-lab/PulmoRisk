@@ -74,7 +74,17 @@ class FieldParser:
         try:
             return int(stripped)
         except ValueError:
+            pass
+        try:
+            # pandas silently upcasts a CSV row's int cells to "0.0"-style
+            # floats whenever another cell in that same row is NaN — accept
+            # a whole-number float string rather than rejecting a valid row.
+            as_float = float(stripped)
+        except ValueError:
             raise ParseError(field, f"{display} must be a whole number")
+        if not as_float.is_integer():
+            raise ParseError(field, f"{display} must be a whole number")
+        return int(as_float)
 
     @staticmethod
     def optional_float(field: str, raw: str, label: str | None = None) -> float | None:
@@ -110,6 +120,15 @@ def _cell(row: dict, field: str) -> str:
     if isinstance(value, float) and math.isnan(value):
         return ""
     return str(value)
+
+
+def find_blank_fields(row: dict, field_names: tuple[str, ...]) -> list[str]:
+    """Which of *field_names* are blank/missing in this CSV row.
+
+    Used by the batch controllers to enforce "at most one field blank per
+    row", mirroring the single-patient form's rule.
+    """
+    return [f for f in field_names if not _cell(row, f).strip()]
 
 
 class BatchSybilRowParser:

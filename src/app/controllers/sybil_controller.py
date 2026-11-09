@@ -14,13 +14,19 @@ import pandas as pd
 from app.controllers.base_controller import BaseController
 from app.models.individual_model import SybilInputData
 from app.utils.event_bus import AppEvent, EventBus
+from app.utils.field_options import (
+    SYBIL_CATEGORICAL_OPTIONS,
+    SYBIL_FIELD_DISPLAY_NAMES,
+    SYBIL_NUMERIC_FIELD_OPTIONS,
+    SYBIL_OPTIONAL_FIELDS,
+)
 from app.utils.helpers import validate_ct_path
 from app.utils.sybil_epi import (
     calculate_sybil_epi_score,
     epi_input_from_individual_data,
 )
 from app.utils.sybil_inference import run_sybil_pipeline
-from app.utils.validators import BatchSybilRowParser, ParseError
+from app.utils.validators import BatchSybilRowParser, ParseError, find_blank_fields
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
@@ -226,13 +232,27 @@ class SybilController(BaseController):
         # the batch loop already catches Exception and logs it per-row.
         return SybilInputData(**parsed)
 
+    @staticmethod
+    def _candidates_for(field: str) -> dict:
+        """Label → value options for whichever field is missing in a row."""
+        return SYBIL_NUMERIC_FIELD_OPTIONS.get(field) or SYBIL_CATEGORICAL_OPTIONS[field]
+
+    def _blank_row_result(self, row_dict: dict, error: str) -> dict:
+        return {
+            **row_dict,
+            "epi_risk": None,
+            "ct_series_selected": None,
+            "missing_field": None,
+            "error": error,
+        }
+
     def _run_batch_worker(self, csv_path: str) -> None:
         try:
             self._batch_active = True
             self._batch_cancel = False
 
             df = pd.read_csv(csv_path)
-            results = []
+            output_rows: list[dict] = []
 
             total = len(df)
 
@@ -253,67 +273,107 @@ class SybilController(BaseController):
 
                 if self._batch_cancel:
                     self._log("Batch cancelled by user", "WARNING")
-
-                    remaining = total - len(results)
-
-                    results.extend(
-                        [
-                            {"epi": None, "ct_series_selected": None, "error": "cancelled"}
-                            for _ in range(remaining)
-                        ]
-                    )
+                    for j in range(i, total):
+                        output_rows.append(
+                            self._blank_row_result(dict(df.iloc[j]), "cancelled")
+                        )
                     break
 
+                row_dict = dict(row)
+
+                # At most one field (other than ct_scan_dir / six_year_risk,
+                # which already has its own required-one-of-two rule) may
+                # be blank — mirrors the single-patient form's rule.
+                blank = find_blank_fields(row_dict, SYBIL_OPTIONAL_FIELDS)
+                if len(blank) > 1:
+                    names = ", ".join(
+                        SYBIL_FIELD_DISPLAY_NAMES.get(f, f) for f in blank
+                    )
+                    msg = f"Only one field may be missing. Currently missing: {names}."
+                    self._warn(f"Row {i + 1} skipped: {msg}")
+                    output_rows.append(self._blank_row_result(row_dict, msg))
+                    continue
+
+                ambiguous_field = blank[0] if blank else None
+
+                if len(find_blank_fields(row_dict, ("ct_scan_dir", "six_year_risk"))) == 2:
+                    msg = (
+                        "Either the CT scan folder (ct_scan_dir) or the "
+                        "6-year Sybil risk (six_year_risk) is required."
+                    )
+                    self._warn(f"Row {i + 1} skipped: {msg}")
+                    output_rows.append(self._blank_row_result(row_dict, msg))
+                    continue
+
                 try:
-                    individual = self._row_to_individual(row)
+                    parse_row = dict(row_dict)
+                    if ambiguous_field:
+                        # A placeholder for the base run below — overwritten
+                        # per candidate once the CT/EPI score is in hand.
+                        placeholder = next(iter(self._candidates_for(ambiguous_field).values()))
+                        parse_row[ambiguous_field] = str(placeholder)
+
+                    individual = self._row_to_individual(parse_row)
 
                     if individual.six_year_risk is None:
                         ok, msg = validate_ct_path(Path(individual.ct_scan_dir))
                         if not ok:
                             self._warn(f"Row {i + 1} skipped: {msg}")
-                            results.append(
-                                {
-                                    "epi": None,
-                                    "ct_series_selected": None,
-                                    "error": msg,
-                                }
-                            )
+                            output_rows.append(self._blank_row_result(row_dict, msg))
                             continue
 
                     self._log(f"Running inference on row {i + 1} for individual: ")
                     self._log(json.dumps(asdict(individual)))
 
-                    epi, series_label = run_sybil_pipeline(self._model, individual)
+                    epi, series_label, six_year_score = run_sybil_pipeline(
+                        self._model, individual
+                    )
                     if series_label:
                         self._log(f"Row {i + 1}: using CT series \"{series_label}\"")
 
-                    results.append(
-                        {
-                            "epi": epi,
-                            "ct_series_selected": series_label,
-                            "error": None,
-                        }
-                    )
+                    if ambiguous_field:
+                        # Reuse the CT/6-year score above — only the cheap
+                        # EPI step reruns for each of the field's options.
+                        field_label = SYBIL_FIELD_DISPLAY_NAMES.get(
+                            ambiguous_field, ambiguous_field
+                        )
+                        for value in self._candidates_for(ambiguous_field).values():
+                            variant = replace(individual, **{ambiguous_field: value})
+                            epi_in = epi_input_from_individual_data(
+                                variant, six_year_score
+                            )
+                            output_rows.append(
+                                {
+                                    **row_dict,
+                                    ambiguous_field: value,
+                                    "epi_risk": calculate_sybil_epi_score(epi_in),
+                                    "ct_series_selected": series_label,
+                                    "missing_field": field_label,
+                                    "error": None,
+                                }
+                            )
+                    else:
+                        output_rows.append(
+                            {
+                                **row_dict,
+                                "epi_risk": epi,
+                                "ct_series_selected": series_label,
+                                "missing_field": None,
+                                "error": None,
+                            }
+                        )
 
                 except Exception as e:
-                    self._error(f"Row {i + 1} failed: {e}")
-                    self._error(traceback.format_exc())
-                    results.append(
-                        {
-                            "epi": None,
-                            "ct_series_selected": None,
-                            "error": str(e),
-                        }
-                    )
+                    self._log_error(f"Row {i + 1} failed: {e}")
+                    self._log_error(traceback.format_exc())
+                    output_rows.append(self._blank_row_result(row_dict, str(e)))
 
-            df["epi_risk"] = [r["epi"] for r in results]
-            df["ct_series_selected"] = [r["ct_series_selected"] for r in results]
-            df["error"] = [r["error"] for r in results]
+            output_df = pd.DataFrame(output_rows)
 
             output_path = str(Path(csv_path).with_suffix(""))
             output_path = output_path + "_scored.csv"
 
-            df.to_csv(output_path, index=False)
+            output_df.to_csv(output_path, index=False)
 
             self._batch_active = False
             self._set_state("idle")
